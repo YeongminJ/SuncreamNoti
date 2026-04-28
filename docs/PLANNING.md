@@ -74,11 +74,32 @@
 ### v0.2 이후
 
 - **백엔드 + 토스 프로모션 API** → 진짜 토스 포인트 지급
-- **스마트 발송(푸시)** → 슬롯 시간에 알림 발송 (서버 cron + `sendMessage`)
+- **스마트 발송(푸시)** → 슬롯 시간에 알림 발송 (서버 cron + `sendMessage`) — [server/](../server/) 스캐폴딩 완료
 - **위치 권한 + UV 지수** 표시 및 간격 자동 보정
 - **연속 출석/배지** 시스템
 - **공유 리워드** (`contactsViral`)
 - **수영/운동 모드** (80분 룰)
+
+## 서버 아키텍처 (v0.2 진행 중)
+
+`server/` 디렉토리에 Cloudflare Workers 기반 백엔드 스캐폴딩 완료. 자세한 운영 가이드는
+[server/README.md](../server/README.md) 참조.
+
+| 영역 | 선택 | 비용 |
+|---|---|---|
+| 런타임 | Cloudflare Workers (Free) | ₩0 (10만 req/일 한도) |
+| DB | D1 (SQLite) | ₩0 (5M reads/일 + 25GB) |
+| Cron | Workers Cron Triggers | ₩0 (무제한) |
+| 객체 스토리지 | R2 (선택) | ₩0 |
+| 토스 mTLS | `mtls_certificates` 바인딩 | 무료 플랜 검증 필요 — 막히면 Deno Deploy/GH Actions 릴레이로 폴백 |
+
+핵심 흐름:
+1. 클라가 온보딩 완료 시 `getAnonymousKey()` → `POST /api/users`로 스케줄 등록
+2. CF Cron `* * * * *` (매 분, UTC) → `scheduled()` 핸들러 → KST 분 변환 후 D1 query
+3. 도래한 슬롯 사용자에게 `sendMessage` (현재는 mock 콘솔 로그)
+4. `notifications` 테이블에 (userKey, date, slotMinute) unique로 중복 방지
+
+스키마: `users` / `user_slots` / `notifications` (자세한 건 [server/src/db/schema.ts](../server/src/db/schema.ts)).
 
 ## 5. 리워드 구조 (확정)
 

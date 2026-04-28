@@ -1,0 +1,12 @@
+node_modules/
+.wrangler/
+.dev.vars
+*.log
+.DS_Store
+
+# Local DB / state
+.miniflare/
+
+# Build / deploy artifacts
+dist/
+.cf-workers/

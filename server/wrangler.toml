@@ -1,0 +1,33 @@
+name = "suncream-noti-api"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 개발용 환경변수. 토스 mTLS 인증서 도착 후 "real"로 전환.
+[vars]
+TOSS_MODE = "mock"
+
+# D1 (SQLite) 바인딩.
+# 처음 셋업 시 `wrangler d1 create suncream-noti-db`로 만든 뒤 출력된
+# database_id를 아래 빈 칸에 채워주세요.
+[[d1_databases]]
+binding = "DB"
+database_name = "suncream-noti-db"
+database_id = ""
+migrations_dir = "drizzle/migrations"
+
+# Cron Trigger — 매 분 (UTC 기준이지만 KST 변환은 코드에서 처리).
+[triggers]
+crons = ["* * * * *"]
+
+# (선택) R2 바인딩 — 로그/cert 백업 등 향후 활용.
+# [[r2_buckets]]
+# binding = "REWARD_BUCKET"
+# bucket_name = "your-existing-bucket"
+
+# 토스 mTLS 인증서 바인딩 — 인증서 도착 후 활성화.
+# 1. wrangler mtls-certificate upload --cert toss.crt --key toss.key --name toss
+# 2. 출력된 certificate_id를 아래 채우고 주석 해제.
+# [[mtls_certificates]]
+# binding = "TOSS_CERT"
+# certificate_id = ""

@@ -1,6 +1,7 @@
 import { Button, Top } from "@toss/tds-mobile";
 import { useEffect, useMemo, useState } from "react";
 import { EmojiBubble } from "../components/EmojiBubble";
+import { getUserKey, registerUser } from "../lib/api";
 import { trackClick, trackScreen } from "../lib/track";
 import {
   formatHm,
@@ -59,6 +60,21 @@ export function OnboardingScreen() {
       endMinute,
       completedAt: Date.now(),
     });
+
+    // 서버에 사용자 등록 (fire-and-forget) — 실패해도 로컬 동작은 그대로.
+    void (async () => {
+      const userKey = await getUserKey();
+      if (!userKey) return;
+      await registerUser({
+        userKey,
+        skinType,
+        environment,
+        startMinute,
+        endMinute,
+        slotMinutes: previewSlots,
+      });
+    })();
+
     navigate("home");
   };
 
