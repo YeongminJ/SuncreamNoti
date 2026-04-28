@@ -13,7 +13,7 @@ TOSS_MODE = "mock"
 [[d1_databases]]
 binding = "DB"
 database_name = "suncream-noti-db"
-database_id = ""
+database_id = "bbcff655-ecae-4770-9281-77a56a843537"
 migrations_dir = "drizzle/migrations"
 
 # Cron Trigger — 매 분 (UTC 기준이지만 KST 변환은 코드에서 처리).
