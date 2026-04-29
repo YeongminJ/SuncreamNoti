@@ -58,15 +58,23 @@ export function recommendedSlotMinutes(input: {
   return slots;
 }
 
-/** 피부타입 + 환경 → 권장 도포 간격 (분). 실내·혼합 환경은 살짝 길게 풀어줌. */
+/**
+ * 피부타입 + 환경 → 권장 도포 간격 (분).
+ * 실내·혼합 환경은 살짝 길게 풀어준 뒤, **1시간 단위로 반올림**해서
+ * UI(chip grid·요약 pill)에 30분 단위가 섞이지 않도록 정렬.
+ */
 export function recommendedIntervalMinutes(
   skinType: SkinType,
   environment: Environment,
 ): number {
   const base = BASE_INTERVAL_MIN[skinType];
-  if (environment === "indoor") return base + 30;
-  if (environment === "mixed") return base + 15;
-  return base;
+  const adjusted =
+    environment === "indoor"
+      ? base + 30
+      : environment === "mixed"
+        ? base + 15
+        : base;
+  return Math.round(adjusted / 60) * 60;
 }
 
 /** 가이드 카드용 한 줄 안내 텍스트. */

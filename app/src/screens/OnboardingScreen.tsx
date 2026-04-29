@@ -40,14 +40,26 @@ export function OnboardingScreen() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [skinType, setSkinType] = useState<SkinType>("III");
   const [environment, setEnvironment] = useState<Environment>("outdoor");
-  // 첫 진입 시 기본값: 08:00을 시작으로 권장 간격 자동 채움.
-  // 한 번 설정하면 이후 사용자가 직접 토글할 때까지 유지.
+  // 사용자가 chip을 직접 토글하기 전엔 skin/env 변경에 따라 자동 갱신.
+  // 토글하는 순간 hasCustomized=true → 그 이후엔 사용자 선택 보존.
+  const [hasCustomized, setHasCustomized] = useState(false);
+  // 첫 진입 시 기본값: 08:00 시작 + 권장 간격 자동 채움.
   const [selectedSlots, setSelectedSlots] = useState<Set<number>>(
     () =>
       new Set(
         recommendedSlotsFromStart("III", "outdoor", DEFAULT_START_MINUTE),
       ),
   );
+
+  // skin/env 변경되면 (사용자가 chip 안 건드린 경우만) 자동 재계산
+  useEffect(() => {
+    if (hasCustomized) return;
+    setSelectedSlots(
+      new Set(
+        recommendedSlotsFromStart(skinType, environment, DEFAULT_START_MINUTE),
+      ),
+    );
+  }, [skinType, environment, hasCustomized]);
 
   useEffect(() => {
     trackScreen("screen_onboarding", { step });
@@ -64,8 +76,9 @@ export function OnboardingScreen() {
   );
 
   const handleHourClick = (m: number) => {
+    setHasCustomized(true);
     if (selectedSlots.size === 0) {
-      // 첫 클릭 = 시작 시간 → 권장 간격으로 자동 채움
+      // 비어 있는 상태에서 첫 클릭 = 시작 시간 → 권장 간격으로 자동 채움
       const auto = recommendedSlotsFromStart(skinType, environment, m);
       setSelectedSlots(new Set(auto));
       return;
@@ -80,7 +93,15 @@ export function OnboardingScreen() {
     setSelectedSlots(next);
   };
 
-  const resetSlots = () => setSelectedSlots(new Set());
+  // 초기화 = 사용자 커스터마이징 해제 + 가이드 기준 자동 채움 복원
+  const resetSlots = () => {
+    setHasCustomized(false);
+    setSelectedSlots(
+      new Set(
+        recommendedSlotsFromStart(skinType, environment, DEFAULT_START_MINUTE),
+      ),
+    );
+  };
 
   const submit = () => {
     if (sortedSlots.length === 0) return;
