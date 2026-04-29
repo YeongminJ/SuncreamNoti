@@ -78,14 +78,18 @@ export function OnboardingScreen() {
       });
       if (!reg.ok) return;
 
-      // 토스 로그인은 미니앱 환경에서만 의미가 있어요. dev/브라우저는 스킵.
-      if (import.meta.env.DEV) return;
-
+      // 토스 로그인 시도. 실기기 샌드박스/토스앱 환경이면 토스 동의 화면이 뜨고,
+      // 일반 브라우저(dev) 환경이면 SDK가 미지원/에러 반환 → 조용히 스킵.
       try {
         const auth = await appLogin();
         if (!auth || typeof auth !== "object" || !("authorizationCode" in auth)) {
-          console.warn("[onboarding] appLogin 미지원 또는 실패");
+          if (import.meta.env.DEV) {
+            console.debug("[onboarding] appLogin 미지원 환경 (브라우저 dev) — 스킵");
+          }
           return;
+        }
+        if (import.meta.env.DEV) {
+          console.debug("[onboarding] appLogin 인가코드 획득, 서버 교환 시작");
         }
         await loginWithToss({
           userKey,
@@ -140,7 +144,7 @@ export function OnboardingScreen() {
                     <span
                       style={{
                         background: "#FFF3EC",
-                        color: "#FF8A4C",
+                        color: "#FF9B3C",
                         fontSize: 11,
                         padding: "2px 6px",
                         borderRadius: 6,
@@ -201,7 +205,7 @@ export function OnboardingScreen() {
                     key={i}
                     style={{
                       padding: "8px 12px",
-                      background: "#FF8A4C",
+                      background: "#FF9B3C",
                       color: "#fff",
                       borderRadius: 999,
                       fontSize: 14,
@@ -304,10 +308,28 @@ function ChoiceRow({
       style={{
         textAlign: "left",
         background: selected ? "#FFF3EC" : "#F8FAFC",
-        border: `2px solid ${selected ? "#FF8A4C" : "transparent"}`,
+        border: `2px solid ${selected ? "#FF9B3C" : "transparent"}`,
         borderRadius: 14,
         padding: "16px 20px",
         cursor: "pointer",
+        // 모바일 WebKit 기본 탭 하이라이트(검정 반투명) 제거 + 자체 토글 색만 사용
+        WebkitTapHighlightColor: "transparent",
+        WebkitAppearance: "none",
+        appearance: "none",
+        outline: "none",
+        transition: "background 120ms ease, border-color 120ms ease",
+        color: "inherit",
+        font: "inherit",
+      }}
+      onTouchStart={(e) => {
+        // 누르는 순간에도 주황 계열로 살짝 강조 (선택 안 된 항목도 검정 X)
+        e.currentTarget.style.background = "#FFE7D6";
+      }}
+      onTouchEnd={(e) => {
+        e.currentTarget.style.background = selected ? "#FFF3EC" : "#F8FAFC";
+      }}
+      onTouchCancel={(e) => {
+        e.currentTarget.style.background = selected ? "#FFF3EC" : "#F8FAFC";
       }}
     >
       <div style={{ display: "flex", alignItems: "center" }}>
@@ -356,7 +378,7 @@ function TimeRow({
         style={{
           fontSize: 16,
           fontWeight: 600,
-          color: "#FF8A4C",
+          color: "#FF9B3C",
           background: "#fff",
           border: "1px solid #E2E8F0",
           borderRadius: 14,

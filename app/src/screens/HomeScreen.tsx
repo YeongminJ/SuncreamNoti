@@ -168,7 +168,7 @@ function NextCard({
     return (
       <div
         style={{
-          background: "linear-gradient(135deg, #FF8A4C 0%, #FF6A2D 100%)",
+          background: "linear-gradient(135deg, #FF9B3C 0%, #FF7E2E 100%)",
           color: "#fff",
           borderRadius: 20,
           padding: 24,
@@ -199,7 +199,7 @@ function NextCard({
     <div
       style={{
         background: isUnlocked
-          ? "linear-gradient(135deg, #FF8A4C 0%, #FF6A2D 100%)"
+          ? "linear-gradient(135deg, #FF9B3C 0%, #FF7E2E 100%)"
           : "linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)",
         color: isUnlocked ? "#fff" : "#0F172A",
         borderRadius: 20,
@@ -268,7 +268,7 @@ function SlotRow({
     statusColor = "#10B981";
   } else if (isCurrent) {
     statusText = now >= slot.targetMinute ? "지금" : "대기 중";
-    statusColor = "#FF8A4C";
+    statusColor = "#FF9B3C";
   } else if (missed) {
     statusText = "놓침";
     statusColor = "#94A3B8";

@@ -4,7 +4,7 @@ export default defineConfig({
   appName: "dailysuncream",
   brand: {
     displayName: "선크림 알림",
-    primaryColor: "#FF8A4C",
+    primaryColor: "#FF9B3C",
     icon: "",
   },
   web: {

@@ -77,7 +77,7 @@ export function WelcomeScreen() {
       >
         <div style={{ position: "relative", width: 220, height: 140 }}>
           <div style={{ position: "absolute", left: 0, top: 0 }}>
-            <EmojiBubble size={130} background="#FF8A4C">
+            <EmojiBubble size={130} background="#FF9B3C">
               <span style={{ filter: "saturate(1.2)" }}>🧴</span>
             </EmojiBubble>
           </div>

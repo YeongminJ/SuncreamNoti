@@ -88,7 +88,7 @@ export function ApplyResultScreen() {
         <div
           style={{
             background: applied
-              ? "linear-gradient(135deg, #FF8A4C 0%, #FF6A2D 100%)"
+              ? "linear-gradient(135deg, #FF9B3C 0%, #FF7E2E 100%)"
               : "#F8FAFC",
             borderRadius: 20,
             padding: 28,
