@@ -58,6 +58,55 @@ export function recommendedSlotMinutes(input: {
   return slots;
 }
 
+/** 피부타입 + 환경 → 권장 도포 간격 (분). 실내·혼합 환경은 살짝 길게 풀어줌. */
+export function recommendedIntervalMinutes(
+  skinType: SkinType,
+  environment: Environment,
+): number {
+  const base = BASE_INTERVAL_MIN[skinType];
+  if (environment === "indoor") return base + 30;
+  if (environment === "mixed") return base + 15;
+  return base;
+}
+
+/** 가이드 카드용 한 줄 안내 텍스트. */
+export function guidanceText(
+  skinType: SkinType,
+  environment: Environment,
+): string {
+  const interval = recommendedIntervalMinutes(skinType, environment);
+  const hours = interval / 60;
+  const hStr = Number.isInteger(hours)
+    ? `약 ${hours}시간`
+    : `약 ${hours.toFixed(1)}시간`;
+  const envSuffix = {
+    indoor: "실내라 횟수가 적어도 충분해요",
+    outdoor: "실외 활동이 많으니 꾸준히 챙겨주세요",
+    mixed: "외출 전후로 챙기면 좋아요",
+  }[environment];
+  return `${hStr}마다 발라주는 게 좋아요. ${envSuffix}`;
+}
+
+/**
+ * 시작 시각 + 간격 기준 자동 슬롯 생성.
+ * 22:00까지 추가하되 회당 최대 8개로 제한.
+ */
+export function recommendedSlotsFromStart(
+  skinType: SkinType,
+  environment: Environment,
+  startMinute: number,
+  dayEndMinute = 22 * 60,
+): number[] {
+  const interval = recommendedIntervalMinutes(skinType, environment);
+  const slots: number[] = [];
+  let cursor = startMinute;
+  while (cursor <= dayEndMinute && slots.length < 8) {
+    slots.push(cursor);
+    cursor += interval;
+  }
+  return slots;
+}
+
 /** 회차별 기본 적립 (1→2원, 2→3원, 3→4원, 4→5원). */
 export function baseRewardForIndex(index: number): number {
   return 2 + index;

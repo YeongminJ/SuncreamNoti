@@ -1,26 +1,22 @@
 import { create } from "zustand";
 import { readJSON, writeJSON } from "../lib/storage";
-import {
-  recommendedSlotMinutes,
-  type Environment,
-  type SkinType,
-} from "../lib/recommendation";
+import type { Environment, SkinType } from "../lib/recommendation";
 
-const STORAGE_KEY = "sunalarm.profile.v1";
+const STORAGE_KEY = "sunalarm.profile.v2";
 
 export interface Profile {
   skinType: SkinType;
   environment: Environment;
-  startMinute: number; // 0~1439
-  endMinute: number;
-  completedAt: number; // epoch ms
+  /** KST 분 단위 슬롯 시각 배열 (사용자가 직접 선택). */
+  slotMinutes: number[];
+  completedAt: number;
 }
 
 interface ProfileState {
   profile: Profile | null;
   setProfile: (p: Profile) => void;
   reset: () => void;
-  /** 오늘의 권장 슬롯 시각(분). 프로필 미설정 시 빈 배열. */
+  /** 오늘의 권장 슬롯 시각 (분). 프로필 미설정 시 빈 배열. */
   slotsForToday: () => number[];
 }
 
@@ -34,14 +30,5 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     writeJSON(STORAGE_KEY, null);
     set({ profile: null });
   },
-  slotsForToday: () => {
-    const p = get().profile;
-    if (p == null) return [];
-    return recommendedSlotMinutes({
-      skinType: p.skinType,
-      environment: p.environment,
-      startMinute: p.startMinute,
-      endMinute: p.endMinute,
-    });
-  },
+  slotsForToday: () => get().profile?.slotMinutes ?? [],
 }));
