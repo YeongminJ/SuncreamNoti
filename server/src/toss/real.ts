@@ -23,18 +23,43 @@ const PATH_LOGIN_ME = "/api-partner/v1/apps-in-toss/user/oauth2/login-me";
 const PATH_SEND_MESSAGE =
   "/api-partner/v1/apps-in-toss/messenger/send-message";
 
+/**
+ * Toss API 에러 응답 파서.
+ *
+ * 실제 응답 스키마(공식 docs):
+ *   resultType: "SUCCESS" | "HTTP_TIMEOUT" | "NETWORK_ERROR" |
+ *               "EXECUTION_FAIL" | "INTERRUPTED" | "INTERNAL_ERROR" | "FAIL"
+ *   error: {
+ *     errorType: number,
+ *     errorCode: string,
+ *     reason: string,
+ *     title: string,
+ *     data: object
+ *   }
+ */
 function describeError(payload: unknown, status: number): string {
   if (payload && typeof payload === "object") {
     const obj = payload as Record<string, unknown>;
+
+    const resultType =
+      typeof obj.resultType === "string" ? obj.resultType : undefined;
+
     const error = obj.error;
     if (error && typeof error === "object") {
       const e = error as Record<string, unknown>;
-      const code = e.code ?? e.errorCode;
-      const msg = e.message ?? e.errorMessage;
-      if (msg) return `${code ?? "ERR"}: ${msg}`;
+      const errorCode = typeof e.errorCode === "string" ? e.errorCode : "ERR";
+      const reason = typeof e.reason === "string" ? e.reason : undefined;
+      const title = typeof e.title === "string" ? e.title : undefined;
+      const detail = reason ?? title;
+      if (detail) {
+        return resultType
+          ? `${resultType} ${errorCode}: ${detail}`
+          : `${errorCode}: ${detail}`;
+      }
+      return `${resultType ?? "ERR"} ${errorCode}`;
     }
-    if (typeof obj.errorMessage === "string") return obj.errorMessage;
-    if (typeof obj.message === "string") return obj.message;
+
+    if (resultType) return `${resultType} (HTTP ${status})`;
   }
   return `HTTP ${status}`;
 }
