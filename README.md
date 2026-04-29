@@ -25,7 +25,7 @@ daily_sunguard/
 ```bash
 cd app
 npm run dev
-# 샌드박스 앱에서 intoss://sunscreen-alarm 으로 접속
+# 샌드박스 앱에서 intoss://dailysuncream 으로 접속
 ```
 
 자세한 기획·결정 사항은 [docs/PLANNING.md](./docs/PLANNING.md) 참조.

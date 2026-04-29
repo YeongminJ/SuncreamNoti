@@ -76,7 +76,7 @@ export async function runTick(
         userKey,
         title: "선크림 바를 시간이에요 ☀️",
         body: "광고 보고 피부도 챙기고 포인트도 챙겨요",
-        scheme: "intoss://sunscreen-alarm",
+        scheme: "intoss://dailysuncream",
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

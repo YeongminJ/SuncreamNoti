@@ -1,7 +1,7 @@
 import { defineConfig } from "@apps-in-toss/web-framework/config";
 
 export default defineConfig({
-  appName: "sunscreen-alarm",
+  appName: "dailysuncream",
   brand: {
     displayName: "선크림 알림",
     primaryColor: "#FF8A4C",

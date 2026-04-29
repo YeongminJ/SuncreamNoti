@@ -4,7 +4,7 @@ export interface SendMessageInput {
   userKey: string;
   title: string;
   body: string;
-  /** 탭 시 진입할 토스 인앱 스킴. 예: `intoss://sunscreen-alarm` */
+  /** 탭 시 진입할 토스 인앱 스킴. 예: `intoss://dailysuncream` */
   scheme?: string;
 }
 

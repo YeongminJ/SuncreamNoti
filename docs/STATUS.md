@@ -39,7 +39,7 @@
 - 서버 등록 fire-and-forget: 온보딩 완료 시 `getAnonymousKey()` → `POST /api/users`
 
 `granite.config.ts`:
-- `appName=sunscreen-alarm`, `displayName=선크림 알림`, `primaryColor=#FF8A4C`
+- `appName=dailysuncream`, `displayName=선크림 알림`, `primaryColor=#FF8A4C`
 - `host=192.168.68.113`, `port=5273` (5173은 bible-miniapp이 점유)
 
 ## 3. 서버 (server/) 구조
@@ -87,7 +87,7 @@ server/src/
 - 모니터링: `cd server && npm run tail`
 
 ### B. 토스 콘솔 등록 + 출시 트랙 (사용자 트랙)
-1. https://apps-in-toss.toss.im 진입 → 워크스페이스 + 미니앱 등록 (`appName=sunscreen-alarm`)
+1. https://apps-in-toss.toss.im 진입 → 워크스페이스 + 미니앱 등록 (`appName=dailysuncream`)
 2. 카테고리: 비게임 유틸 — 라이프/헬스케어
 3. **API 키(시크릿 토큰) 발급** → `cd app && npx ait token add`
 4. **광고 그룹 발급** (보상형 + 배너) → `app/src/hooks/useRewardedAd.ts`와 `app/src/components/BannerAdSlot.tsx`의 `PROD_AD_GROUP_ID` 채우기
@@ -146,6 +146,6 @@ server/src/
 
 - **GitHub**: https://github.com/YeongminJ/SuncreamNoti
 - **로컬 LAN IP**: 192.168.68.113 (Wi-Fi 바뀌면 `ipconfig getifaddr en0`로 갱신 후 [granite.config.ts](../app/granite.config.ts) 업데이트)
-- **샌드박스 진입**: `intoss://sunscreen-alarm`
+- **샌드박스 진입**: `intoss://dailysuncream`
 - **Wrangler 로그인 상태**: ✅ (`npx wrangler login` 완료)
 - **CF 계정 보유 리소스**: R2 (기존), D1 (오늘 생성)
