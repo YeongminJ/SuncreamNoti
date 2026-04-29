@@ -1,0 +1,7 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { background: transparent; }
+body {
+  font-family: "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", system-ui,
+    -apple-system, sans-serif;
+  overflow: hidden;
+}

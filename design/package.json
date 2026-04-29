@@ -1,0 +1,9 @@
+{
+  "name": "daily-sunguard-design",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "install-chrome": "browsers install chrome --path ./.chromium",
+    "render": "node render.mjs"
+  }
+}

@@ -1,0 +1,232 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="_shared.css" />
+    <style>
+      body {
+        width: 600px;
+        height: 600px;
+        overflow: hidden;
+      }
+      .canvas {
+        position: relative;
+        width: 600px;
+        height: 600px;
+        /* warm orange sunset gradient — natural in dark mode too */
+        background:
+          radial-gradient(ellipse at 25% 18%, #FFD66B 0%, transparent 55%),
+          radial-gradient(ellipse at 80% 85%, #FF5A2A 0%, transparent 60%),
+          radial-gradient(circle at 50% 50%, #FF8A4C 0%, #FF6A2D 60%, #E04E15 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      /* subtle warm grain */
+      .canvas::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        opacity: 0.06;
+        background-image:
+          repeating-linear-gradient(45deg, #FFFFFF 0 2px, transparent 2px 26px),
+          repeating-linear-gradient(-45deg, #FFFFFF 0 2px, transparent 2px 26px);
+        pointer-events: none;
+      }
+      /* outer warm ring */
+      .ring {
+        position: absolute;
+        inset: 60px;
+        border-radius: 50%;
+        border: 6px solid rgba(255, 246, 214, 0.32);
+        box-shadow:
+          0 0 80px rgba(255, 214, 107, 0.28) inset,
+          0 0 40px rgba(255, 214, 107, 0.18);
+      }
+      /* sun rays behind */
+      .rays {
+        position: absolute;
+        width: 520px;
+        height: 520px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        opacity: 0.45;
+        pointer-events: none;
+      }
+      .safe {
+        position: relative;
+        width: 440px;
+        height: 440px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        z-index: 2;
+      }
+      .tube {
+        width: 240px;
+        height: 240px;
+        filter: drop-shadow(0 10px 22px rgba(74, 22, 0, 0.45))
+          drop-shadow(0 0 28px rgba(255, 246, 214, 0.35));
+      }
+      .title {
+        font-family: "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR",
+          system-ui, sans-serif;
+        font-weight: 900;
+        font-size: 78px;
+        line-height: 1;
+        letter-spacing: -3px;
+        white-space: nowrap;
+        color: #FFFFFF;
+        text-shadow:
+          0 4px 14px rgba(120, 40, 0, 0.55),
+          0 2px 4px rgba(120, 40, 0, 0.35);
+        margin-top: 14px;
+      }
+      .sub {
+        font-family: "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR",
+          system-ui, sans-serif;
+        font-weight: 800;
+        font-size: 18px;
+        letter-spacing: 8px;
+        color: #FFF6D6;
+        opacity: 0.95;
+        margin-top: 8px;
+        padding-left: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="canvas">
+      <div class="ring"></div>
+
+      <!-- soft sun rays in the background -->
+      <svg class="rays" viewBox="0 0 520 520" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="rayGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#FFF6D6" stop-opacity="0.6" />
+            <stop offset="100%" stop-color="#FFF6D6" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+        <g stroke="#FFF6D6" stroke-width="6" stroke-linecap="round"
+           transform="translate(260 260)" opacity="0.55">
+          <line x1="0" y1="-220" x2="0" y2="-170" />
+          <line x1="0" y1="220" x2="0" y2="170" />
+          <line x1="-220" y1="0" x2="-170" y2="0" />
+          <line x1="220" y1="0" x2="170" y2="0" />
+          <line x1="-156" y1="-156" x2="-120" y2="-120" />
+          <line x1="156" y1="-156" x2="120" y2="-120" />
+          <line x1="-156" y1="156" x2="-120" y2="120" />
+          <line x1="156" y1="156" x2="120" y2="120" />
+          <line x1="-84" y1="-204" x2="-65" y2="-158" />
+          <line x1="84" y1="-204" x2="65" y2="-158" />
+          <line x1="-204" y1="-84" x2="-158" y2="-65" />
+          <line x1="204" y1="-84" x2="158" y2="-65" />
+        </g>
+      </svg>
+
+      <div class="safe">
+        <!-- sunscreen tube illustration -->
+        <svg class="tube" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFFDF5" />
+              <stop offset="55%" stop-color="#FFF1C8" />
+              <stop offset="100%" stop-color="#FFD78A" />
+            </linearGradient>
+            <linearGradient id="capGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFE187" />
+              <stop offset="100%" stop-color="#FFB347" />
+            </linearGradient>
+            <linearGradient id="labelGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FF8A4C" />
+              <stop offset="100%" stop-color="#FF6A2D" />
+            </linearGradient>
+            <linearGradient id="dropGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFFDF5" />
+              <stop offset="100%" stop-color="#FFE9B5" />
+            </linearGradient>
+          </defs>
+
+          <!-- sun behind tube (top right) -->
+          <circle cx="190" cy="58" r="30"
+            fill="#FFE187" stroke="#FFFFFF" stroke-width="4" />
+          <circle cx="190" cy="58" r="22" fill="#FFD66B" />
+
+          <!-- tube body -->
+          <rect x="58" y="68" width="100" height="142" rx="22"
+            fill="url(#bodyGrad)" stroke="#7A2E00" stroke-width="5"
+            stroke-linejoin="round" />
+
+          <!-- crimped tail -->
+          <path d="M 58 210 Q 64 224 78 224 L 138 224 Q 152 224 158 210"
+            fill="none" stroke="#7A2E00" stroke-width="5"
+            stroke-linejoin="round" stroke-linecap="round" />
+          <line x1="78" y1="216" x2="78" y2="224"
+            stroke="#7A2E00" stroke-width="3" stroke-linecap="round" />
+          <line x1="98" y1="216" x2="98" y2="224"
+            stroke="#7A2E00" stroke-width="3" stroke-linecap="round" />
+          <line x1="118" y1="216" x2="118" y2="224"
+            stroke="#7A2E00" stroke-width="3" stroke-linecap="round" />
+          <line x1="138" y1="216" x2="138" y2="224"
+            stroke="#7A2E00" stroke-width="3" stroke-linecap="round" />
+
+          <!-- shoulder -->
+          <path d="M 58 86 Q 108 60 158 86"
+            fill="url(#bodyGrad)" stroke="#7A2E00" stroke-width="5"
+            stroke-linejoin="round" />
+
+          <!-- nozzle -->
+          <rect x="96" y="44" width="24" height="22"
+            fill="url(#bodyGrad)" stroke="#7A2E00" stroke-width="5"
+            stroke-linejoin="round" />
+
+          <!-- cap -->
+          <rect x="84" y="14" width="48" height="34" rx="8"
+            fill="url(#capGrad)" stroke="#7A2E00" stroke-width="5"
+            stroke-linejoin="round" />
+          <line x1="92" y1="22" x2="92" y2="40"
+            stroke="#7A2E00" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+          <line x1="100" y1="22" x2="100" y2="40"
+            stroke="#7A2E00" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+          <line x1="108" y1="22" x2="108" y2="40"
+            stroke="#7A2E00" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+          <line x1="116" y1="22" x2="116" y2="40"
+            stroke="#7A2E00" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+          <line x1="124" y1="22" x2="124" y2="40"
+            stroke="#7A2E00" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+
+          <!-- orange label band -->
+          <rect x="64" y="108" width="88" height="68" rx="10"
+            fill="url(#labelGrad)" stroke="#7A2E00" stroke-width="4" />
+
+          <!-- SPF text on label -->
+          <text x="108" y="146" text-anchor="middle"
+            font-family="'Apple SD Gothic Neo','Pretendard',system-ui,sans-serif"
+            font-weight="900" font-size="30" fill="#FFFFFF"
+            letter-spacing="1">SPF</text>
+          <text x="108" y="170" text-anchor="middle"
+            font-family="'Apple SD Gothic Neo','Pretendard',system-ui,sans-serif"
+            font-weight="900" font-size="20" fill="#FFF6D6"
+            letter-spacing="2">50+</text>
+
+          <!-- shine on body -->
+          <path d="M 70 92 Q 76 130 70 188"
+            fill="none" stroke="#FFFFFF" stroke-width="4"
+            stroke-linecap="round" opacity="0.45" />
+
+          <!-- cream droplet popping out -->
+          <path d="M 108 6 Q 90 -2 96 14 Q 102 4 108 6 Z"
+            fill="url(#dropGrad)" stroke="#7A2E00" stroke-width="3"
+            stroke-linejoin="round" />
+        </svg>
+
+        <div class="title">선크림 알림</div>
+        <div class="sub">SUNCREAM NOTI</div>
+      </div>
+    </div>
+  </body>
+</html>

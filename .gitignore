@@ -8,6 +8,9 @@ dist/
 build/
 .next/
 out/
+# design/out은 마케팅 산출물 — 예외
+!design/out/
+!design/out/**
 
 # Environment
 .env

@@ -1,0 +1,278 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="_shared.css" />
+    <style>
+      body {
+        width: 1932px;
+        height: 828px;
+        position: relative;
+        background:
+          radial-gradient(ellipse at 18% 30%, #FFE9A8 0%, transparent 55%),
+          radial-gradient(ellipse at 82% 80%, #FF5A2A 0%, transparent 60%),
+          radial-gradient(circle at 50% 50%, #FF8A4C 0%, #FF6A2D 60%, #E04E15 100%);
+        overflow: hidden;
+      }
+      body::before {
+        content: ""; position: absolute; inset: 0; opacity: 0.06;
+        background-image:
+          repeating-linear-gradient(45deg, #FFFFFF 0 2px, transparent 2px 28px),
+          repeating-linear-gradient(-45deg, #FFFFFF 0 2px, transparent 2px 28px);
+      }
+
+      /* big soft sun glow at right */
+      .sunglow {
+        position: absolute;
+        right: -160px; top: -160px;
+        width: 720px; height: 720px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 50% 50%,
+          rgba(255, 246, 214, 0.55) 0%,
+          rgba(255, 246, 214, 0.2) 35%,
+          rgba(255, 246, 214, 0) 70%);
+        pointer-events: none;
+      }
+
+      .wrap {
+        position: relative; z-index: 1; width: 100%; height: 100%;
+        display: grid; grid-template-columns: 1fr 1fr;
+        align-items: center; padding: 80px 100px;
+        color: #FFFFFF;
+        gap: 40px;
+      }
+
+      .left .tag {
+        display: inline-block; padding: 10px 22px;
+        background: rgba(255, 246, 214, 0.18);
+        border: 1.5px solid rgba(255, 246, 214, 0.7);
+        color: #FFF6D6;
+        border-radius: 999px;
+        font-weight: 800; letter-spacing: 3px; font-size: 18px;
+        margin-bottom: 28px;
+      }
+      .left .title {
+        font-size: 152px; font-weight: 900; line-height: 1;
+        letter-spacing: -5px;
+        white-space: nowrap;
+        color: #FFFFFF;
+        text-shadow:
+          0 8px 22px rgba(120, 40, 0, 0.55),
+          0 2px 6px rgba(120, 40, 0, 0.4);
+      }
+      .left .sub {
+        font-size: 42px; font-weight: 800; color: #FFFFFF;
+        margin-top: 22px; letter-spacing: -1px;
+        text-shadow: 0 4px 12px rgba(120, 40, 0, 0.4);
+      }
+      .left .desc {
+        font-size: 26px; color: rgba(255, 255, 255, 0.92);
+        margin-top: 20px; line-height: 1.5; font-weight: 500;
+      }
+      .left .features {
+        display: flex; gap: 16px; margin-top: 38px; flex-wrap: wrap;
+      }
+      .feat {
+        padding: 14px 22px;
+        background: rgba(255, 255, 255, 0.18);
+        border: 1.5px solid rgba(255, 246, 214, 0.6);
+        border-radius: 999px;
+        font-size: 20px; font-weight: 800;
+        color: #FFF6D6; letter-spacing: 0.5px;
+        backdrop-filter: blur(4px);
+      }
+
+      /* right side: big logo mark + reward badge */
+      .right {
+        position: relative; height: 100%;
+        display: flex; align-items: center; justify-content: center;
+      }
+
+      .logoframe {
+        position: relative;
+        width: 560px; height: 560px;
+        border-radius: 50%;
+        background:
+          radial-gradient(ellipse at 25% 18%, #FFD66B 0%, transparent 55%),
+          radial-gradient(ellipse at 80% 85%, #FF5A2A 0%, transparent 60%),
+          radial-gradient(circle at 50% 50%, #FF8A4C 0%, #FF6A2D 60%, #C9450F 100%);
+        border: 6px solid rgba(255, 246, 214, 0.45);
+        box-shadow:
+          0 30px 80px rgba(80, 24, 0, 0.55),
+          0 0 90px rgba(255, 214, 107, 0.35) inset;
+        display: flex; align-items: center; justify-content: center;
+        overflow: hidden;
+      }
+      .logoframe::before {
+        content: ""; position: absolute; inset: 0; opacity: 0.06;
+        background-image:
+          repeating-linear-gradient(45deg, #FFFFFF 0 2px, transparent 2px 26px),
+          repeating-linear-gradient(-45deg, #FFFFFF 0 2px, transparent 2px 26px);
+      }
+      .rays {
+        position: absolute; inset: 0;
+        pointer-events: none;
+      }
+      .tube {
+        position: relative;
+        width: 320px; height: 320px;
+        z-index: 2;
+        filter: drop-shadow(0 14px 28px rgba(74, 22, 0, 0.5))
+          drop-shadow(0 0 30px rgba(255, 246, 214, 0.4));
+      }
+
+      /* floating badges */
+      .float-badge {
+        position: absolute; padding: 14px 22px; border-radius: 999px;
+        font-weight: 900; font-size: 26px; letter-spacing: 0.5px;
+        box-shadow: 0 12px 28px rgba(80, 24, 0, 0.5);
+      }
+      .float-badge.reward {
+        top: 70px; right: 60px;
+        background: linear-gradient(135deg, #FFE187, #FFB347);
+        color: #7A2E00;
+        transform: rotate(8deg);
+        border: 3px solid #FFFFFF;
+      }
+      .float-badge.alarm {
+        bottom: 80px; right: 40px;
+        background: #FFFFFF;
+        color: #FF6A2D;
+        transform: rotate(-6deg);
+        border: 3px solid #FFE187;
+        font-size: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sunglow"></div>
+
+    <div class="wrap">
+      <div class="left">
+        <div class="tag">DAILY SUNGUARD</div>
+        <div class="title">선크림 알림</div>
+        <div class="sub">매일 선크림 바르고 피부 챙겨요</div>
+        <div class="desc">
+          정해 둔 시간에 알림이 와요.<br />
+          광고 한 번 보고 매일 포인트도 쌓아 보세요.
+        </div>
+        <div class="features">
+          <div class="feat">시간 맞춤 알림</div>
+          <div class="feat">SPF 도포 기록</div>
+          <div class="feat">하루 최대 15원</div>
+          <div class="feat">자외선 지수 안내</div>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="logoframe">
+          <!-- sun rays inside the circle -->
+          <svg class="rays" viewBox="0 0 560 560" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#FFF6D6" stroke-width="7" stroke-linecap="round"
+               transform="translate(280 280)" opacity="0.5">
+              <line x1="0" y1="-240" x2="0" y2="-188" />
+              <line x1="0" y1="240" x2="0" y2="188" />
+              <line x1="-240" y1="0" x2="-188" y2="0" />
+              <line x1="240" y1="0" x2="188" y2="0" />
+              <line x1="-170" y1="-170" x2="-132" y2="-132" />
+              <line x1="170" y1="-170" x2="132" y2="-132" />
+              <line x1="-170" y1="170" x2="-132" y2="132" />
+              <line x1="170" y1="170" x2="132" y2="132" />
+              <line x1="-92" y1="-222" x2="-72" y2="-174" />
+              <line x1="92" y1="-222" x2="72" y2="-174" />
+              <line x1="-222" y1="-92" x2="-174" y2="-72" />
+              <line x1="222" y1="-92" x2="174" y2="-72" />
+              <line x1="-92" y1="222" x2="-72" y2="174" />
+              <line x1="92" y1="222" x2="72" y2="174" />
+              <line x1="-222" y1="92" x2="-174" y2="72" />
+              <line x1="222" y1="92" x2="174" y2="72" />
+            </g>
+          </svg>
+
+          <!-- sunscreen tube -->
+          <svg class="tube" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="bodyGrad2" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#FFFDF5" />
+                <stop offset="55%" stop-color="#FFF1C8" />
+                <stop offset="100%" stop-color="#FFD78A" />
+              </linearGradient>
+              <linearGradient id="capGrad2" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#FFE187" />
+                <stop offset="100%" stop-color="#FFB347" />
+              </linearGradient>
+              <linearGradient id="labelGrad2" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#FF8A4C" />
+                <stop offset="100%" stop-color="#FF6A2D" />
+              </linearGradient>
+              <linearGradient id="dropGrad2" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#FFFDF5" />
+                <stop offset="100%" stop-color="#FFE9B5" />
+              </linearGradient>
+            </defs>
+
+            <circle cx="190" cy="58" r="30"
+              fill="#FFE187" stroke="#FFFFFF" stroke-width="4" />
+            <circle cx="190" cy="58" r="22" fill="#FFD66B" />
+
+            <rect x="58" y="68" width="100" height="142" rx="22"
+              fill="url(#bodyGrad2)" stroke="#7A2E00" stroke-width="5"
+              stroke-linejoin="round" />
+            <path d="M 58 210 Q 64 224 78 224 L 138 224 Q 152 224 158 210"
+              fill="none" stroke="#7A2E00" stroke-width="5"
+              stroke-linejoin="round" stroke-linecap="round" />
+            <line x1="78" y1="216" x2="78" y2="224"
+              stroke="#7A2E00" stroke-width="3" stroke-linecap="round" />
+            <line x1="98" y1="216" x2="98" y2="224"
+              stroke="#7A2E00" stroke-width="3" stroke-linecap="round" />
+            <line x1="118" y1="216" x2="118" y2="224"
+              stroke="#7A2E00" stroke-width="3" stroke-linecap="round" />
+            <line x1="138" y1="216" x2="138" y2="224"
+              stroke="#7A2E00" stroke-width="3" stroke-linecap="round" />
+
+            <path d="M 58 86 Q 108 60 158 86"
+              fill="url(#bodyGrad2)" stroke="#7A2E00" stroke-width="5"
+              stroke-linejoin="round" />
+            <rect x="96" y="44" width="24" height="22"
+              fill="url(#bodyGrad2)" stroke="#7A2E00" stroke-width="5"
+              stroke-linejoin="round" />
+            <rect x="84" y="14" width="48" height="34" rx="8"
+              fill="url(#capGrad2)" stroke="#7A2E00" stroke-width="5"
+              stroke-linejoin="round" />
+            <line x1="92" y1="22" x2="92" y2="40"
+              stroke="#7A2E00" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+            <line x1="100" y1="22" x2="100" y2="40"
+              stroke="#7A2E00" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+            <line x1="108" y1="22" x2="108" y2="40"
+              stroke="#7A2E00" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+            <line x1="116" y1="22" x2="116" y2="40"
+              stroke="#7A2E00" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+            <line x1="124" y1="22" x2="124" y2="40"
+              stroke="#7A2E00" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+
+            <rect x="64" y="108" width="88" height="68" rx="10"
+              fill="url(#labelGrad2)" stroke="#7A2E00" stroke-width="4" />
+            <text x="108" y="146" text-anchor="middle"
+              font-family="'Apple SD Gothic Neo','Pretendard',system-ui,sans-serif"
+              font-weight="900" font-size="30" fill="#FFFFFF"
+              letter-spacing="1">SPF</text>
+            <text x="108" y="170" text-anchor="middle"
+              font-family="'Apple SD Gothic Neo','Pretendard',system-ui,sans-serif"
+              font-weight="900" font-size="20" fill="#FFF6D6"
+              letter-spacing="2">50+</text>
+
+            <path d="M 70 92 Q 76 130 70 188"
+              fill="none" stroke="#FFFFFF" stroke-width="4"
+              stroke-linecap="round" opacity="0.45" />
+            <path d="M 108 6 Q 90 -2 96 14 Q 102 4 108 6 Z"
+              fill="url(#dropGrad2)" stroke="#7A2E00" stroke-width="3"
+              stroke-linejoin="round" />
+          </svg>
+        </div>
+
+        <div class="float-badge reward">하루 최대 15원</div>
+        <div class="float-badge alarm">알림 ON</div>
+      </div>
+    </div>
+  </body>
+</html>

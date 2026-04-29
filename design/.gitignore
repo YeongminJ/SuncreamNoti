@@ -1,0 +1,6 @@
+# Puppeteer 번들 Chromium 캐시 (재생성 시 자동 다운로드)
+.chromium/
+
+# node_modules는 root .gitignore에서 이미 제외됨 (확실히 하려고 한번 더)
+node_modules/
+package-lock.json
