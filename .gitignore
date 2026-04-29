@@ -17,6 +17,15 @@ out/
 .env.local
 .env.*.local
 
+# Secrets / certificates — 절대 커밋 금지
+*.key
+*.crt
+*.pem
+*.pfx
+*.p12
+secrets/
+.secrets/
+
 # Claude Code / IDE
 .claude/settings.local.json
 .vscode/
