@@ -22,12 +22,16 @@ const ENVIRONMENTS: { value: Environment; label: string; desc: string }[] = [
   { value: "indoor", label: "주로 실내", desc: "사무실·집에서 보내요" },
 ];
 
-/** Step 3 시간 chip grid: 06:00 ~ 22:00, 1시간 단위. */
+/**
+ * Step 3 시간 chip grid: 06:00 ~ 16:00, 1시간 단위 (11개).
+ * 자외선이 강한 시간대만. 16시 이후는 권장에서 제외.
+ */
 const HOUR_GRID: number[] = Array.from(
-  { length: 17 },
+  { length: 11 },
   (_, i) => (6 + i) * 60,
 );
-const MAX_SLOTS = 8;
+const MAX_SLOTS = 6;
+const DEFAULT_START_MINUTE = 8 * 60;
 
 export function OnboardingScreen() {
   const setProfile = useProfileStore((s) => s.setProfile);
@@ -36,7 +40,14 @@ export function OnboardingScreen() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [skinType, setSkinType] = useState<SkinType>("III");
   const [environment, setEnvironment] = useState<Environment>("outdoor");
-  const [selectedSlots, setSelectedSlots] = useState<Set<number>>(new Set());
+  // 첫 진입 시 기본값: 08:00을 시작으로 권장 간격 자동 채움.
+  // 한 번 설정하면 이후 사용자가 직접 토글할 때까지 유지.
+  const [selectedSlots, setSelectedSlots] = useState<Set<number>>(
+    () =>
+      new Set(
+        recommendedSlotsFromStart("III", "outdoor", DEFAULT_START_MINUTE),
+      ),
+  );
 
   useEffect(() => {
     trackScreen("screen_onboarding", { step });
@@ -230,6 +241,17 @@ export function OnboardingScreen() {
               </span>
             </div>
 
+            <div
+              style={{
+                fontSize: 12,
+                color: "#94A3B8",
+                marginBottom: 12,
+                textAlign: "center",
+              }}
+            >
+              자외선이 강한 낮 시간대만 안내해요
+            </div>
+
             {/* 시간 chip grid */}
             <div
               style={{
@@ -307,7 +329,7 @@ export function OnboardingScreen() {
                       color: "#64748B",
                     }}
                   >
-                    오늘 {sortedSlots.length}번 알림 받을게요
+                    일일 {sortedSlots.length}번 바르기
                   </div>
                   <button
                     onClick={resetSlots}

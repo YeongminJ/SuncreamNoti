@@ -89,18 +89,18 @@ export function guidanceText(
 
 /**
  * 시작 시각 + 간격 기준 자동 슬롯 생성.
- * 22:00까지 추가하되 회당 최대 8개로 제한.
+ * 자외선 활성 시간대(~18:00)까지만 채우고, 회당 최대 6개로 제한.
  */
 export function recommendedSlotsFromStart(
   skinType: SkinType,
   environment: Environment,
   startMinute: number,
-  dayEndMinute = 22 * 60,
+  dayEndMinute = 18 * 60,
 ): number[] {
   const interval = recommendedIntervalMinutes(skinType, environment);
   const slots: number[] = [];
   let cursor = startMinute;
-  while (cursor <= dayEndMinute && slots.length < 8) {
+  while (cursor <= dayEndMinute && slots.length < 6) {
     slots.push(cursor);
     cursor += interval;
   }
