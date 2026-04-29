@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { runTick } from "./cron/tick";
 import type { Env } from "./env";
+import auth from "./routes/auth";
 import health from "./routes/health";
 import users from "./routes/users";
 
@@ -18,6 +19,7 @@ app.use(
 );
 
 app.route("/api/users", users);
+app.route("/api/auth", auth);
 app.route("/api/health", health);
 
 app.get("/", (c) => c.text("suncream-noti-api"));

@@ -102,3 +102,44 @@ export async function unregisterUser(
     return { ok: false, error: msg };
   }
 }
+
+/**
+ * 토스 로그인 인가코드 + referrer를 서버에 보내서 numeric tossUserKey 획득·저장.
+ * 푸시 알림(스마트 발송) 활성화 전제.
+ *
+ * 호출 전 `registerUser`로 사용자가 서버에 등록돼 있어야 해요.
+ */
+export async function loginWithToss(input: {
+  userKey: string;
+  authorizationCode: string;
+  referrer: "DEFAULT" | "SANDBOX";
+}): Promise<{ ok: boolean; tossUserKey?: number; error?: string }> {
+  try {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      tossUserKey?: number;
+      error?: string;
+      step?: string;
+    } | null;
+    if (!res.ok || !data?.ok) {
+      const errorMsg = data?.error
+        ? `${data.step ?? "?"}: ${data.error}`
+        : `HTTP ${res.status}`;
+      console.warn("[api] loginWithToss failed", errorMsg);
+      return { ok: false, error: errorMsg };
+    }
+    if (import.meta.env.DEV) {
+      console.debug("[api] loginWithToss ok", data.tossUserKey);
+    }
+    return { ok: true, tossUserKey: data.tossUserKey };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("[api] loginWithToss threw", msg);
+    return { ok: false, error: msg };
+  }
+}

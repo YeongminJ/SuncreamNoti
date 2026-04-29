@@ -1,7 +1,8 @@
+import { appLogin } from "@apps-in-toss/web-framework";
 import { Button, Top } from "@toss/tds-mobile";
 import { useEffect, useMemo, useState } from "react";
 import { EmojiBubble } from "../components/EmojiBubble";
-import { getUserKey, registerUser } from "../lib/api";
+import { getUserKey, loginWithToss, registerUser } from "../lib/api";
 import { trackClick, trackScreen } from "../lib/track";
 import {
   formatHm,
@@ -61,11 +62,13 @@ export function OnboardingScreen() {
       completedAt: Date.now(),
     });
 
-    // 서버에 사용자 등록 (fire-and-forget) — 실패해도 로컬 동작은 그대로.
+    // 서버 등록 + 토스 로그인 (푸시 알림용 tossUserKey 획득).
+    // 실패해도 로컬 동작은 그대로 — 푸시만 안 올 뿐.
     void (async () => {
       const userKey = await getUserKey();
       if (!userKey) return;
-      await registerUser({
+
+      const reg = await registerUser({
         userKey,
         skinType,
         environment,
@@ -73,6 +76,25 @@ export function OnboardingScreen() {
         endMinute,
         slotMinutes: previewSlots,
       });
+      if (!reg.ok) return;
+
+      // 토스 로그인은 미니앱 환경에서만 의미가 있어요. dev/브라우저는 스킵.
+      if (import.meta.env.DEV) return;
+
+      try {
+        const auth = await appLogin();
+        if (!auth || typeof auth !== "object" || !("authorizationCode" in auth)) {
+          console.warn("[onboarding] appLogin 미지원 또는 실패");
+          return;
+        }
+        await loginWithToss({
+          userKey,
+          authorizationCode: auth.authorizationCode,
+          referrer: auth.referrer,
+        });
+      } catch (err) {
+        console.warn("[onboarding] toss login flow failed", err);
+      }
     })();
 
     navigate("home");

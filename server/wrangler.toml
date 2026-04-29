@@ -3,9 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2026-04-01"
 compatibility_flags = ["nodejs_compat"]
 
-# 개발용 환경변수. 토스 mTLS 인증서 도착 후 "real"로 전환.
+# Toss API 모드: "mock" | "real". mTLS 인증서·템플릿 코드 모두 준비된 후 "real"로.
 [vars]
-TOSS_MODE = "mock"
+TOSS_MODE = "real"
+TOSS_BASE_URL = "https://apps-in-toss-api.toss.im"
+# 콘솔에서 등록한 메시지 템플릿 코드 — 등록 후 wrangler secret으로 주입 권장.
+# 우선 placeholder; 실제 발송 시 secret/PROD 값으로 교체.
+TOSS_TEMPLATE_SET_CODE = "PLACEHOLDER_TEMPLATE_CODE"
 
 # D1 (SQLite) 바인딩.
 # 처음 셋업 시 `wrangler d1 create suncream-noti-db`로 만든 뒤 출력된
@@ -25,9 +29,8 @@ crons = ["* * * * *"]
 # binding = "REWARD_BUCKET"
 # bucket_name = "your-existing-bucket"
 
-# 토스 mTLS 인증서 바인딩 — 인증서 도착 후 활성화.
-# 1. wrangler mtls-certificate upload --cert toss.crt --key toss.key --name toss
-# 2. 출력된 certificate_id를 아래 채우고 주석 해제.
-# [[mtls_certificates]]
-# binding = "TOSS_CERT"
-# certificate_id = ""
+# 토스 mTLS 인증서 바인딩 (Apps-in-Toss 콘솔 발급 → wrangler upload).
+# fetch 시 env.TOSS_CERT.fetch(url, init)로 호출하면 mTLS 자동 적용.
+[[mtls_certificates]]
+binding = "TOSS_CERT"
+certificate_id = "3017ff96-2c5c-4ec2-9b7e-3e7b5e297ddd"

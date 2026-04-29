@@ -7,11 +7,16 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 /**
- * 사용자 한 명당 1행. `user_key`는 토스 `getAnonymousKey()`로 발급받은 식별자.
+ * 사용자 한 명당 1행.
+ * - `user_key`: 우리 시스템 PK. 토스 `getAnonymousKey()` hash. 클라가 보냄.
+ * - `toss_user_key`: 토스 `loginMe`로 받은 numeric userKey. sendMessage의 `x-toss-user-key`.
+ *   토스 로그인 전엔 NULL. NULL인 동안엔 cron이 발송 대상에서 제외.
+ *
  * 슬롯 시각은 정규화된 `user_slots` 테이블에 저장.
  */
 export const users = sqliteTable("users", {
   userKey: text("user_key").primaryKey(),
+  tossUserKey: integer("toss_user_key"),
   skinType: text("skin_type").notNull(),
   environment: text("environment").notNull(),
   startMinute: integer("start_minute").notNull(),

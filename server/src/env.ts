@@ -9,12 +9,12 @@ export interface Env {
   /** mock | real — Toss API 모드 */
   TOSS_MODE: "mock" | "real";
 
-  /** (real 모드 전용) 토스 sendMessage 베이스 URL */
-  TOSS_BASE_URL?: string;
+  /** Toss API 베이스 URL (real 모드) */
+  TOSS_BASE_URL: string;
 
-  /** (real 모드 전용) 토스 발급 API 키 (secret) */
-  TOSS_API_KEY?: string;
+  /** 콘솔에서 등록한 메시지 템플릿 코드 (real 모드 sendMessage 필수) */
+  TOSS_TEMPLATE_SET_CODE: string;
 
-  /** (real 모드 전용) mTLS 인증서 바인딩 */
+  /** mTLS 인증서 바인딩 — env.TOSS_CERT.fetch(...) 형태로 사용 */
   TOSS_CERT?: Fetcher;
 }

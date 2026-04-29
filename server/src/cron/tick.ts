@@ -1,6 +1,6 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { notifications, userSlots } from "../db/schema";
+import { notifications, users, userSlots } from "../db/schema";
 import type { Env } from "../env";
 import { nowKstDate, nowKstMinute } from "../lib/time";
 import { getTossClient } from "../toss/factory";
@@ -9,9 +9,10 @@ import { getTossClient } from "../toss/factory";
  * 매 분 실행되는 cron 본체.
  *
  * 1. 현재 KST 분(0~1439)을 기준으로 슬롯 일치 사용자 찾기
- * 2. 오늘 같은 슬롯에 이미 'sent' 처리된 사용자는 제외
- * 3. 각 사용자에게 토스 sendMessage 호출 (mock 또는 real)
- * 4. notifications 테이블에 결과 기록 (sent / failed)
+ * 2. 토스 로그인 미완료(toss_user_key IS NULL) 사용자는 발송 대상에서 제외
+ * 3. 오늘 같은 슬롯에 이미 'sent' 처리된 사용자는 제외
+ * 4. 각 사용자에게 토스 sendMessage 호출 (mock 또는 real mTLS)
+ * 5. notifications 테이블에 결과 기록 (sent / failed)
  */
 export async function runTick(
   env: Env,
@@ -22,11 +23,17 @@ export async function runTick(
   const kstDate = nowKstDate(fired);
   const db = getDb(env.DB);
 
-  // 1) 분 일치 사용자 후보
+  // 1) 분 일치 + 토스 로그인 완료 사용자 후보 (slot ⨝ users)
   const candidates = await db
-    .select({ userKey: userSlots.userKey })
+    .select({
+      userKey: users.userKey,
+      tossUserKey: users.tossUserKey,
+    })
     .from(userSlots)
-    .where(eq(userSlots.slotMinute, kstMinute))
+    .innerJoin(users, eq(users.userKey, userSlots.userKey))
+    .where(
+      and(eq(userSlots.slotMinute, kstMinute), isNotNull(users.tossUserKey)),
+    )
     .all();
 
   if (candidates.length === 0) {
@@ -48,7 +55,7 @@ export async function runTick(
     )
     .all();
   const alreadySentSet = new Set(alreadySent.map((r) => r.userKey));
-  const toNotify = userKeys.filter((k) => !alreadySentSet.has(k));
+  const toNotify = candidates.filter((c) => !alreadySentSet.has(c.userKey));
 
   if (toNotify.length === 0) {
     return;
@@ -61,26 +68,30 @@ export async function runTick(
       kstMinute,
       candidateCount: candidates.length,
       toNotifyCount: toNotify.length,
+      mode: env.TOSS_MODE,
     }),
   );
 
-  // 3) 각 사용자에게 발송
   const toss = getTossClient(env);
   const sentTime = Date.now();
+  const templateSetCode = env.TOSS_TEMPLATE_SET_CODE;
 
-  // 동시성: 너무 많이 띄우면 D1 throttling 우려. 직렬 처리로 충분(매분 ~수십명).
-  for (const userKey of toNotify) {
+  // 동시성: 너무 많이 띄우면 D1·Toss 양쪽 throttle 우려. 직렬 처리로 충분(매 분 ~수십명).
+  for (const cand of toNotify) {
+    if (cand.tossUserKey == null) continue; // 타입 가드 (where절에서 걸렀지만)
+
     let result: { ok: boolean; error?: string };
     try {
       result = await toss.sendMessage({
-        userKey,
-        title: "선크림 바를 시간이에요 ☀️",
-        body: "광고 보고 피부도 챙기고 포인트도 챙겨요",
-        scheme: "intoss://dailysuncream",
+        tossUserKey: cand.tossUserKey,
+        templateSetCode,
+        context: {
+          slotMinute: cand.userKey, // 템플릿에서 변수로 사용 가능 (미사용 OK)
+        },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("[tick] sendMessage threw", userKey, msg);
+      console.error("[tick] sendMessage threw", cand.userKey, msg);
       result = { ok: false, error: msg };
     }
 
@@ -88,7 +99,7 @@ export async function runTick(
       await db
         .insert(notifications)
         .values({
-          userKey,
+          userKey: cand.userKey,
           date: kstDate,
           slotMinute: kstMinute,
           status: result.ok ? "sent" : "failed",
@@ -100,7 +111,7 @@ export async function runTick(
       // 동시 처리로 unique 충돌 정도면 무시 가능.
       console.error(
         "[tick] notifications insert failed",
-        userKey,
+        cand.userKey,
         err instanceof Error ? err.message : err,
       );
     }
