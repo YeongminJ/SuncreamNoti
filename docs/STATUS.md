@@ -1,4 +1,4 @@
-# 작업 현황 — 2026-04-28 기준
+# 작업 현황 — 2026-04-29 갱신
 
 > 다음 세션에서 이 문서만 보고 어디부터 이어갈지 알 수 있도록 정리.
 
@@ -13,10 +13,18 @@
 | 서버 v0.2 — 스캐폴딩 | ✅ 완료 |
 | 서버 v0.2 — 로컬 D1 마이그레이션 | ✅ 완료 |
 | 서버 v0.2 — 로컬 API 검증 | ✅ POST/GET 통과 |
-| 서버 v0.2 — 원격 D1 마이그레이션 | ⏳ 대기 (`npm run db:migrate:remote`) |
-| 서버 v0.2 — Workers 배포 | ⏳ 대기 (`npm run deploy`) |
+| 서버 v0.2 — **원격 D1 마이그레이션** | ✅ **완료 (2026-04-29)** |
+| 서버 v0.2 — **Workers 배포** | ✅ **완료 (2026-04-29)** |
+| 서버 v0.2 — **원격 종단 검증** | ✅ **cron 매 분 발화 + sendMessage + DB sent 기록 확인** |
+| 서버 v0.2 — 클라 prod URL 연결 | ✅ `app/.env.local` 작성됨 |
 | 토스 mTLS 인증서 | ❌ 미시작 (콘솔 등록 후) |
 | 토스 광고 그룹 ID | ❌ 미시작 (테스트 ID 자동 폴백 중) |
+
+### 배포 정보
+- **워커 URL**: https://suncream-noti-api.hohostd.workers.dev
+- **CF 서브도메인**: hohostd.workers.dev (계정 전체 1회성 등록)
+- **CF 리전**: ICN (인천) 우선
+- **Cron**: `* * * * *` (UTC) — 정확하게 +45초 정도에 발화 확인
 
 ## 2. 미니앱 (app/) 구현
 
@@ -71,14 +79,12 @@ server/src/
 
 ## 4. 다음 단계 (이대로 이어가면 됨)
 
-### A. 서버 원격 배포 (5분, 즉시 가능)
-```bash
-cd server
-npm run db:migrate:remote   # 원격 D1 스키마
-npm run deploy              # → https://suncream-noti-api.<account>.workers.dev
-npm run tail                # 별도 창에서 cron 발화 모니터링
-```
-배포 URL을 [app/.env.local](../app/.env.local)에 `VITE_API_URL=<URL>`로 박으면 prod 클라가 그 서버를 가리킴.
+### A. 서버 원격 배포 ✅ 완료 (2026-04-29)
+- `npm run db:migrate:remote` ✓
+- `npm run deploy` → https://suncream-noti-api.hohostd.workers.dev ✓
+- `app/.env.local`에 `VITE_API_URL` 박힘 ✓
+- 종단 검증: cron 매 분 발화, KST 매칭, mock sendMessage, D1 sent 기록 모두 통과 (slot 1223·1224 두 건 검증 후 삭제)
+- 모니터링: `cd server && npm run tail`
 
 ### B. 토스 콘솔 등록 + 출시 트랙 (사용자 트랙)
 1. https://apps-in-toss.toss.im 진입 → 워크스페이스 + 미니앱 등록 (`appName=sunscreen-alarm`)
@@ -101,7 +107,7 @@ npm run tail                # 별도 창에서 cron 발화 모니터링
 3. `cd app && npx ait deploy -m "v0.1.0 초기 출시"`
 4. 콘솔에서 검수 요청 → 비게임 체크리스트 통과 → 공개
 
-## 5. 오늘 결정 로그 (2026-04-28)
+## 5. 결정 로그 (~ 2026-04-28)
 
 | 결정 | 근거 |
 |---|---|
@@ -115,12 +121,21 @@ npm run tail                # 별도 창에서 cron 발화 모니터링
 | Drizzle 마이그레이션 `0001_` 접두 | wrangler가 양의 정수부터만 인식 |
 | dev 포트 5273 | 5173은 bible-miniapp 점유 충돌 회피 |
 
+### 결정 로그 (2026-04-29)
+
+| 결정 | 근거 |
+|---|---|
+| Wrangler 재로그인으로 D1 7403 해결 | 옛 OAuth 토큰엔 D1 query 스코프 부재 |
+| CF workers.dev 서브도메인 = `hohostd` | 사용자 선택 (계정 1회성) |
+| 종단 검증: 1분 슬롯 2건 cron으로 자동 발송 | mock 단계 백엔드 흐름 100% 검증 완료 |
+
 ## 6. 알려진 제약 / TODO
 
-- [ ] `VITE_API_URL` prod 값 — 워커 배포 후 확정
+- [x] ~~`VITE_API_URL` prod 값~~ — 2026-04-29 완료 (`https://suncream-noti-api.hohostd.workers.dev`)
 - [ ] 토스 보상형 광고 그룹 ID — 콘솔에서 발급 후 [useRewardedAd.ts](../app/src/hooks/useRewardedAd.ts#L25)
 - [ ] 토스 배너 광고 그룹 ID — [BannerAdSlot.tsx](../app/src/components/BannerAdSlot.tsx#L15)
-- [ ] 앱 아이콘(`brand.icon`) — 1024x1024 PNG, 콘솔 업로드
+- [ ] 앱 아이콘(`brand.icon`) — 600×600 PNG, 콘솔 업로드 (디자인 진행 중, `design/` 폴더)
+- [ ] 대표 썸네일 1932×828 — 콘솔 업로드용 (디자인 진행 중)
 - [ ] mTLS 인증서 — 콘솔에서 발급
 - [ ] 출시 전 `?reset=1` URL 핸들러 제거 검토 (보안 영향 미미하지만 클린업)
 - [ ] CF 무료 플랜에서 mTLS 바인딩 가능 여부 실측 (안 되면 Deno Deploy 릴레이)
