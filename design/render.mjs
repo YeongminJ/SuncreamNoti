@@ -11,8 +11,11 @@ import { dirname, resolve } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const tasks = [
-  { html: "logo.html",      out: "out/logo.png",      width: 600,  height: 600  },
-  { html: "thumbnail.html", out: "out/thumbnail.png", width: 1932, height: 828  },
+  { html: "logo.html",         out: "out/logo.png",         width: 600,  height: 600  },
+  { html: "thumbnail.html",    out: "out/thumbnail.png",    width: 1932, height: 828  },
+  { html: "screenshot-1.html", out: "out/screenshot-1.png", width: 636,  height: 1048 },
+  { html: "screenshot-2.html", out: "out/screenshot-2.png", width: 636,  height: 1048 },
+  { html: "screenshot-3.html", out: "out/screenshot-3.png", width: 636,  height: 1048 },
 ];
 
 const CHROME_BIN = resolve(

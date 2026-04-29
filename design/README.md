@@ -8,6 +8,9 @@
 |---|---|---|---|
 | 앱 로고 아이콘 | 600×600 | [out/logo.png](./out/logo.png) | [logo.html](./logo.html) |
 | 가로형 썸네일 | 1932×828 | [out/thumbnail.png](./out/thumbnail.png) | [thumbnail.html](./thumbnail.html) |
+| 스크린샷 1 — 인트로 | 636×1048 | [out/screenshot-1.png](./out/screenshot-1.png) | [screenshot-1.html](./screenshot-1.html) |
+| 스크린샷 2 — 홈 | 636×1048 | [out/screenshot-2.png](./out/screenshot-2.png) | [screenshot-2.html](./screenshot-2.html) |
+| 스크린샷 3 — 적립 결과 | 636×1048 | [out/screenshot-3.png](./out/screenshot-3.png) | [screenshot-3.html](./screenshot-3.html) |
 
 ## 디자인 컨셉
 
@@ -44,7 +47,13 @@ OUT="$PWD/out"
   --window-size=1932,828 --screenshot="$OUT/thumbnail.png" \
   "file://$PWD/thumbnail.html"
 
-file "$OUT/logo.png" "$OUT/thumbnail.png"
+for n in 1 2 3; do
+  "$CHROME" --headless=new --disable-gpu --hide-scrollbars \
+    --window-size=636,1048 --screenshot="$OUT/screenshot-$n.png" \
+    "file://$PWD/screenshot-$n.html"
+done
+
+file "$OUT/logo.png" "$OUT/thumbnail.png" "$OUT"/screenshot-*.png
 ```
 
 ### B. Puppeteer 번들 Chromium으로 (대체)
@@ -55,7 +64,7 @@ file "$OUT/logo.png" "$OUT/thumbnail.png"
 cd /Users/m/claude_workspace/daily_sunguard/design
 npm install                # puppeteer 설치
 npm run install-chrome     # ./.chromium 에 Chrome for Testing 다운로드
-npm run render             # logo.png, thumbnail.png 생성
+npm run render             # logo.png, thumbnail.png, screenshot-{1,2,3}.png 생성
 
-file out/logo.png out/thumbnail.png
+file out/logo.png out/thumbnail.png out/screenshot-*.png
 ```

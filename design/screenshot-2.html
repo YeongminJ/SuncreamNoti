@@ -1,0 +1,354 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="_shared.css" />
+    <style>
+      body {
+        width: 636px;
+        height: 1048px;
+        background: #FFFFFF;
+        color: #0F172A;
+      }
+      /* Status bar */
+      .statusbar {
+        position: relative;
+        height: 44px;
+        padding: 0 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: "Apple SD Gothic Neo", "Pretendard", system-ui, sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        color: #0F172A;
+      }
+      .sb-time { letter-spacing: -0.3px; }
+      .sb-right { display: flex; align-items: center; gap: 6px; }
+      .sb-icon { width: 18px; height: 12px; }
+      .sb-batt {
+        position: relative;
+        width: 28px; height: 13px;
+        border: 1.5px solid #0F172A;
+        border-radius: 4px;
+        padding: 1.5px;
+      }
+      .sb-batt::after {
+        content: "";
+        position: absolute;
+        right: -4px; top: 3px;
+        width: 2px; height: 5px;
+        background: #0F172A;
+        border-radius: 0 2px 2px 0;
+      }
+      .sb-batt-fill { height: 100%; width: 80%; background: #0F172A; border-radius: 2px; }
+
+      .phone {
+        position: relative;
+        width: 636px;
+        height: calc(1048px - 44px);
+      }
+
+      /* Top section (Toss Top component) */
+      .top {
+        padding: 24px 32px 14px;
+      }
+      .top-title {
+        font-size: 32px;
+        font-weight: 800;
+        color: #0F172A;
+        line-height: 1.25;
+        letter-spacing: -1px;
+      }
+      .top-sub {
+        font-size: 16px;
+        color: #64748B;
+        margin-top: 8px;
+        font-weight: 500;
+      }
+
+      /* NextCard */
+      .next-card {
+        margin: 14px 32px 0;
+        background: linear-gradient(135deg, #FF8A4C 0%, #FF6A2D 100%);
+        color: #FFFFFF;
+        border-radius: 22px;
+        padding: 24px 22px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 14px 28px rgba(255, 106, 45, 0.32);
+      }
+      .next-card::before {
+        content: "";
+        position: absolute;
+        right: -40px; top: -40px;
+        width: 220px; height: 220px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 246, 214, 0.25), transparent 70%);
+      }
+      .nc-label {
+        font-size: 14px; opacity: 0.92;
+        font-weight: 600; letter-spacing: -0.2px;
+      }
+      .nc-headline {
+        font-size: 30px;
+        font-weight: 800;
+        margin-top: 6px;
+        line-height: 1.15;
+        letter-spacing: -0.6px;
+      }
+      .nc-foot {
+        font-size: 14px;
+        opacity: 0.92;
+        margin-top: 10px;
+        font-weight: 500;
+      }
+      .nc-bubble {
+        position: absolute;
+        top: 18px; right: 18px;
+        width: 64px; height: 64px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.22);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 0 4px rgba(255,255,255,0.12);
+      }
+      .nc-bubble svg { width: 70%; height: 70%; }
+
+      /* Section heading */
+      .section-h {
+        margin: 26px 32px 12px;
+        font-size: 17px;
+        font-weight: 800;
+        color: #0F172A;
+        letter-spacing: -0.4px;
+      }
+
+      /* Slot rows */
+      .slots { padding: 0 32px; display: flex; flex-direction: column; gap: 10px; }
+      .slot {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 16px;
+        border-radius: 16px;
+      }
+      .slot.done { background: #F0FDF4; border: 1px solid #BBF7D0; }
+      .slot.now { background: #FFF3EC; border: 1px solid #FFD9C2;
+        box-shadow: 0 6px 14px rgba(255,138,76,0.18); }
+      .slot.lock { background: #F8FAFC; border: 1px solid transparent; }
+      .slot-bub {
+        width: 48px; height: 48px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .slot-bub.done { background: #DCFCE7; }
+      .slot-bub.now { background: #FFE7D6; }
+      .slot-bub.lock { background: #E2E8F0; }
+      .slot-bub svg { width: 60%; height: 60%; }
+      .slot-mid { flex: 1; }
+      .slot-mid .row1 { font-size: 14px; color: #64748B; }
+      .slot-mid .row2 { font-size: 19px; font-weight: 800; color: #0F172A; letter-spacing: -0.3px; margin-top: 2px; }
+      .slot-right { text-align: right; }
+      .slot-right .stat { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+      .slot-right .stat.done { color: #10B981; }
+      .slot-right .stat.now { color: #FF6A2D; }
+      .slot-right .stat.lock { color: #94A3B8; }
+      .slot-right .base { font-size: 12px; color: #94A3B8; margin-top: 2px; }
+
+      /* Banner ad placeholder */
+      .banner {
+        margin: 18px 32px 0;
+        height: 64px;
+        border-radius: 14px;
+        background:
+          repeating-linear-gradient(135deg,
+            #F1F5F9 0 8px,
+            #E2E8F0 8px 16px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        color: #94A3B8;
+        font-weight: 700;
+        letter-spacing: -0.2px;
+      }
+
+      /* CTA */
+      .cta-wrap {
+        position: absolute;
+        left: 0; right: 0; bottom: 0;
+        padding: 16px 32px 36px;
+        background: linear-gradient(to top,
+          #FFFFFF 65%,
+          rgba(255,255,255,0.92) 80%,
+          rgba(255,255,255,0));
+      }
+      .cta {
+        height: 64px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, #FF8A4C 0%, #FF6A2D 100%);
+        color: #FFFFFF;
+        font-size: 19px;
+        font-weight: 800;
+        letter-spacing: -0.4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 14px 28px rgba(255, 106, 45, 0.42);
+      }
+      .home-indicator {
+        position: absolute;
+        left: 50%; bottom: 10px; transform: translateX(-50%);
+        width: 130px; height: 5px;
+        border-radius: 3px;
+        background: #0F172A;
+        opacity: 0.85;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Status bar -->
+    <div class="statusbar">
+      <div class="sb-time">9:41</div>
+      <div class="sb-right">
+        <svg class="sb-icon" viewBox="0 0 18 12" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="8" width="3" height="4" rx="0.6" fill="#0F172A"/>
+          <rect x="5" y="6" width="3" height="6" rx="0.6" fill="#0F172A"/>
+          <rect x="10" y="3" width="3" height="9" rx="0.6" fill="#0F172A"/>
+          <rect x="15" y="0" width="3" height="12" rx="0.6" fill="#0F172A"/>
+        </svg>
+        <svg class="sb-icon" viewBox="0 0 18 12" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 11 L11 9 Q9 7.5 7 9 Z" fill="#0F172A"/>
+          <path d="M3.5 5.5 Q9 1 14.5 5.5 L12.5 7.5 Q9 4 5.5 7.5 Z" fill="#0F172A" opacity="0.85"/>
+          <path d="M0.5 2.5 Q9 -3.5 17.5 2.5 L15.5 4.5 Q9 -0.5 2.5 4.5 Z" fill="#0F172A" opacity="0.7"/>
+        </svg>
+        <div class="sb-batt"><div class="sb-batt-fill"></div></div>
+      </div>
+    </div>
+
+    <div class="phone">
+      <!-- Top -->
+      <div class="top">
+        <div class="top-title">오늘 1/3회 발랐어요</div>
+        <div class="top-sub">오늘 적립 2원 · 누적 47원</div>
+      </div>
+
+      <!-- NextCard (unlocked) -->
+      <div class="next-card">
+        <div class="nc-label">2번째 발림 · 예정 12:00</div>
+        <div class="nc-headline">지금 발라주세요!</div>
+        <div class="nc-foot">광고 보면 3원 · 광고 더 보면 +2원까지</div>
+        <div class="nc-bubble">
+          <!-- sun face -->
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#FFFFFF" stroke-width="5" stroke-linecap="round">
+              <line x1="50" y1="10" x2="50" y2="22"/>
+              <line x1="50" y1="78" x2="50" y2="90"/>
+              <line x1="10" y1="50" x2="22" y2="50"/>
+              <line x1="78" y1="50" x2="90" y2="50"/>
+              <line x1="22" y1="22" x2="30" y2="30"/>
+              <line x1="78" y1="22" x2="70" y2="30"/>
+              <line x1="22" y1="78" x2="30" y2="70"/>
+              <line x1="78" y1="78" x2="70" y2="70"/>
+            </g>
+            <circle cx="50" cy="50" r="20" fill="#FFD66B" stroke="#FFFFFF" stroke-width="5"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="section-h">오늘의 권장 시간</div>
+
+      <div class="slots">
+        <!-- 09:00 done -->
+        <div class="slot done">
+          <div class="slot-bub done">
+            <!-- check -->
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="50" cy="50" r="36" fill="#10B981"/>
+              <path d="M 32 52 L 46 64 L 70 38" stroke="#FFFFFF"
+                    stroke-width="9" stroke-linecap="round"
+                    stroke-linejoin="round" fill="none"/>
+            </svg>
+          </div>
+          <div class="slot-mid">
+            <div class="row1">1번째</div>
+            <div class="row2">09:00</div>
+          </div>
+          <div class="slot-right">
+            <div class="stat done">+2원</div>
+            <div class="base">기본 2원</div>
+          </div>
+        </div>
+
+        <!-- 12:00 now -->
+        <div class="slot now">
+          <div class="slot-bub now">
+            <!-- sun -->
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <g stroke="#B45309" stroke-width="5" stroke-linecap="round">
+                <line x1="50" y1="12" x2="50" y2="22"/>
+                <line x1="50" y1="78" x2="50" y2="88"/>
+                <line x1="12" y1="50" x2="22" y2="50"/>
+                <line x1="78" y1="50" x2="88" y2="50"/>
+                <line x1="24" y1="24" x2="30" y2="30"/>
+                <line x1="76" y1="24" x2="70" y2="30"/>
+                <line x1="24" y1="76" x2="30" y2="70"/>
+                <line x1="76" y1="76" x2="70" y2="70"/>
+              </g>
+              <circle cx="50" cy="50" r="18" fill="#FFD66B"
+                      stroke="#B45309" stroke-width="5"/>
+            </svg>
+          </div>
+          <div class="slot-mid">
+            <div class="row1">2번째</div>
+            <div class="row2">12:00</div>
+          </div>
+          <div class="slot-right">
+            <div class="stat now">지금</div>
+            <div class="base">기본 3원</div>
+          </div>
+        </div>
+
+        <!-- 15:00 locked -->
+        <div class="slot lock">
+          <div class="slot-bub lock">
+            <!-- tube small (locked tone) -->
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <rect x="35" y="28" width="30" height="50" rx="7"
+                    fill="#CBD5E1" stroke="#64748B" stroke-width="4"/>
+              <rect x="40" y="16" width="20" height="14" rx="3"
+                    fill="#94A3B8" stroke="#64748B" stroke-width="3.5"/>
+              <rect x="38" y="42" width="24" height="22" rx="3"
+                    fill="#94A3B8" stroke="#64748B" stroke-width="3"/>
+              <text x="50" y="58" text-anchor="middle"
+                    font-family="'Apple SD Gothic Neo',sans-serif"
+                    font-weight="900" font-size="9" fill="#F8FAFC">SPF</text>
+            </svg>
+          </div>
+          <div class="slot-mid">
+            <div class="row1">3번째</div>
+            <div class="row2">15:00</div>
+          </div>
+          <div class="slot-right">
+            <div class="stat lock">잠김</div>
+            <div class="base">기본 4원</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Banner ad placeholder -->
+      <div class="banner">배너 광고 미리보기</div>
+
+      <!-- CTA -->
+      <div class="cta-wrap">
+        <div class="cta">광고 보고 피부 보호하기</div>
+        <div class="home-indicator"></div>
+      </div>
+    </div>
+  </body>
+</html>
