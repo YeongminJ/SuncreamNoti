@@ -2,6 +2,7 @@ import { Button, Top } from "@toss/tds-mobile";
 import { useEffect } from "react";
 import { EmojiBubble } from "../components/EmojiBubble";
 import { useRewardedAd } from "../hooks/useRewardedAd";
+import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
 import {
   AD_BONUS_MAX_PER_SLOT,
   AD_BONUS_PER_VIEW,
@@ -224,6 +225,7 @@ export function ApplyResultScreen() {
               });
               navigate("home");
             }}
+            style={CTA_GRADIENT_STYLE}
           >
             확인
           </Button>
@@ -235,6 +237,7 @@ export function ApplyResultScreen() {
               onClick={watchPrimaryAd}
               disabled={!ad.supported || adBusy}
               loading={ad.state === "showing"}
+              style={CTA_GRADIENT_STYLE}
             >
               {!ad.supported
                 ? "광고 미지원 환경"

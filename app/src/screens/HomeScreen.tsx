@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BannerAdSlot } from "../components/BannerAdSlot";
 import { EmojiBubble } from "../components/EmojiBubble";
 import { useRewardedAd } from "../hooks/useRewardedAd";
+import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
 import {
   MIN_REDEEM_AMOUNT,
   PROMOTION_ENABLED,
@@ -209,6 +210,7 @@ export function HomeScreen() {
             (!ad.supported && !import.meta.env.DEV)
           }
           loading={adBusy}
+          style={CTA_GRADIENT_STYLE}
         >
           {ctaLabel}
         </Button>

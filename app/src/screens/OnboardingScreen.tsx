@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { EmojiBubble } from "../components/EmojiBubble";
 import { LegalSheet, type LegalKind } from "../components/LegalSheet";
 import { getUserKey, loginWithToss, registerUser } from "../lib/api";
+import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
 import {
   formatHm,
   guidanceText,
@@ -465,6 +466,7 @@ export function OnboardingScreen() {
             size="xlarge"
             display="block"
             onClick={() => setStep((s) => (s + 1) as 1 | 2 | 3)}
+            style={CTA_GRADIENT_STYLE}
           >
             다음
           </Button>
@@ -476,6 +478,7 @@ export function OnboardingScreen() {
             disabled={
               selectedSlots.size === 0 || !agreedNotification || !agreedLegal
             }
+            style={CTA_GRADIENT_STYLE}
           >
             시작하기
           </Button>

@@ -1,6 +1,7 @@
 import { Button } from "@toss/tds-mobile";
 import { useEffect } from "react";
 import { EmojiBubble } from "../components/EmojiBubble";
+import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
 import { trackClick, trackScreen } from "../lib/track";
 import { useAppStore } from "../store/useAppStore";
 
@@ -165,7 +166,12 @@ export function WelcomeScreen() {
           background: "linear-gradient(to top, #fff 60%, transparent)",
         }}
       >
-        <Button size="xlarge" display="block" onClick={start}>
+        <Button
+          size="xlarge"
+          display="block"
+          onClick={start}
+          style={CTA_GRADIENT_STYLE}
+        >
           내 피부 보호 시작하기
         </Button>
       </div>
