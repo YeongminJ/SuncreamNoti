@@ -1,4 +1,4 @@
-import { TossAds, getOperationalEnvironment } from "@apps-in-toss/web-framework";
+import { TossAds } from "@apps-in-toss/web-framework";
 import { useEffect, useRef, useState } from "react";
 
 /**
@@ -6,22 +6,17 @@ import { useEffect, useRef, useState } from "react";
  *
  * - 최초 1회 `TossAds.initialize` 호출 (idempotent하게 모듈 단위 가드).
  * - 마운트 시 `TossAds.attachBanner`로 슬롯 부착, 언마운트 시 destroy.
- * - dev / sandbox / PROD ID 미입력 시 자동으로 테스트 광고 그룹으로 폴백.
- * - SDK가 지원되지 않으면 placeholder 박스를 보여줘요(샌드박스/웹 디버깅 용).
+ * - 토스 검수 정책상 출시 번들에 테스트 광고 그룹 ID 문자열이 포함되면 안 되므로
+ *   dev 빌드에서만 테스트 ID를 쓰고 prod 빌드(출시·sandbox 모두)는 실제 ID 사용.
+ *   dev 분기는 Vite DCE로 prod 번들에서 제거돼요.
+ * - SDK가 지원되지 않으면 placeholder 박스를 보여줘요(웹 디버깅 용).
  */
 
-const TEST_AD_GROUP_ID = "ait-ad-test-banner-id";
-const PROD_AD_GROUP_ID = "";
+const PROD_AD_GROUP_ID = "ait.v2.live.8c5302ad3bfc466d";
 
 function resolveAdGroupId(): { id: string; isTest: boolean } {
-  if (!PROD_AD_GROUP_ID) return { id: TEST_AD_GROUP_ID, isTest: true };
-  if (import.meta.env.DEV) return { id: TEST_AD_GROUP_ID, isTest: true };
-  try {
-    if (getOperationalEnvironment() === "sandbox") {
-      return { id: TEST_AD_GROUP_ID, isTest: true };
-    }
-  } catch {
-    return { id: TEST_AD_GROUP_ID, isTest: true };
+  if (import.meta.env.DEV) {
+    return { id: "ait-ad-test-banner-id", isTest: true };
   }
   return { id: PROD_AD_GROUP_ID, isTest: false };
 }

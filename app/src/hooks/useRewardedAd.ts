@@ -1,5 +1,4 @@
 import {
-  getOperationalEnvironment,
   loadFullScreenAd,
   showFullScreenAd,
 } from "@apps-in-toss/web-framework";
@@ -11,28 +10,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * Apps-in-Toss는 전면형/보상형을 통합 API(`loadFullScreenAd`/`showFullScreenAd`)
  * 로 제공해요. 광고 그룹 ID 자체가 보상형/전면형을 구분해요.
  *
- * - 테스트용: `ait-ad-test-rewarded-id`
- *   (https://developers-apps-in-toss.toss.im/ads/develop.html#테스트하기)
- * - 프로덕션: 콘솔에서 **보상형**으로 발급한 광고 그룹 ID를
- *   `PROD_AD_GROUP_ID`에 붙여주세요.
- *
- * 다음 경우에는 자동으로 테스트 ID로 전환돼요:
- *   - Vite dev 빌드
- *   - 앱인토스 샌드박스 환경
- *   - `PROD_AD_GROUP_ID`가 빈 값
+ * 토스 검수 정책: 출시 번들에 테스트 광고 그룹 ID 문자열이 포함되면 안 돼요.
+ * 그래서 dev 빌드에서만 테스트 ID를 사용하고, prod 빌드(출시·sandbox 모두)는
+ * 콘솔에서 발급된 실제 ID를 쓰도록 분기해요. dev 빌드의 테스트 ID 분기는
+ * Vite의 DCE로 prod 번들에서 제거돼요.
  */
-const TEST_AD_GROUP_ID = "ait-ad-test-rewarded-id";
-const PROD_AD_GROUP_ID = "";
+const PROD_AD_GROUP_ID = "ait.v2.live.33e4a898cf514cc4";
 
 function resolveAdGroupId(): { id: string; isTest: boolean } {
-  if (!PROD_AD_GROUP_ID) return { id: TEST_AD_GROUP_ID, isTest: true };
-  if (import.meta.env.DEV) return { id: TEST_AD_GROUP_ID, isTest: true };
-  try {
-    if (getOperationalEnvironment() === "sandbox") {
-      return { id: TEST_AD_GROUP_ID, isTest: true };
-    }
-  } catch {
-    return { id: TEST_AD_GROUP_ID, isTest: true };
+  if (import.meta.env.DEV) {
+    // 브라우저 dev에서는 SDK 미지원 → 시뮬레이션이 동작하므로 ID는 자리만 채움.
+    return { id: "ait-ad-test-rewarded-id", isTest: true };
   }
   return { id: PROD_AD_GROUP_ID, isTest: false };
 }

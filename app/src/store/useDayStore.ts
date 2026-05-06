@@ -28,8 +28,10 @@ export interface DayRecord {
   slots: SlotRecord[];
 }
 
-interface Totals {
+export interface Totals {
   lifetimeReward: number;
+  /** 토스 포인트로 이미 교환한 누적 금액 */
+  redeemedReward: number;
   lastActiveDate: string | null;
   streak: number;
 }
@@ -61,6 +63,8 @@ interface DayState {
   applySlot: (slotIndex: number) => SlotRecord | null;
   /** 광고 시청 후 보너스 누적. */
   addAdBonus: (slotIndex: number) => SlotRecord | null;
+  /** 토스 포인트로 교환 성공 시 누적 차감용. */
+  markRedeemed: (amount: number) => void;
   reset: () => void;
 }
 
@@ -68,6 +72,7 @@ export const useDayStore = create<DayState>((set, get) => ({
   day: readJSON<DayRecord | null>(dayStorageKey(todayKey()), null),
   totals: readJSON<Totals>(TOTALS_KEY, {
     lifetimeReward: 0,
+    redeemedReward: 0,
     lastActiveDate: null,
     streak: 0,
   }),
@@ -158,12 +163,33 @@ export const useDayStore = create<DayState>((set, get) => ({
     return updatedSlot;
   },
 
+  markRedeemed: (amount) => {
+    if (amount <= 0) return;
+    const totals = get().totals;
+    const updated: Totals = {
+      ...totals,
+      redeemedReward: totals.redeemedReward + amount,
+    };
+    writeJSON(TOTALS_KEY, updated);
+    set({ totals: updated });
+  },
+
   reset: () => {
-    const t: Totals = { lifetimeReward: 0, lastActiveDate: null, streak: 0 };
+    const t: Totals = {
+      lifetimeReward: 0,
+      redeemedReward: 0,
+      lastActiveDate: null,
+      streak: 0,
+    };
     writeJSON(TOTALS_KEY, t);
     set({ totals: t, day: null });
   },
 }));
+
+/** 아직 토스 포인트로 교환하지 않은 잔여 적립금. */
+export function redeemableAmount(totals: Totals): number {
+  return Math.max(0, totals.lifetimeReward - totals.redeemedReward);
+}
 
 /** 가장 빨리 발려야 하는 미완료 슬롯 인덱스. 모두 끝났으면 -1. */
 export function nextOpenSlotIndex(day: DayRecord | null): number {

@@ -5,7 +5,8 @@ export default defineConfig({
   brand: {
     displayName: "선크림 알림",
     primaryColor: "#FF9B3C",
-    icon: "",
+    // 콘솔에 업로드한 동일한 600×600 로고. public/에 두면 빌드 시 정적 자산으로 번들돼요.
+    icon: "/icon.png",
   },
   web: {
     // 실기기 샌드박스에서 이 값을 참조해요. Wi-Fi가 바뀌면 현재 Mac LAN IP로

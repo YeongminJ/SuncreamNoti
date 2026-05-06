@@ -2,6 +2,12 @@ import { Button, Top } from "@toss/tds-mobile";
 import { useEffect, useMemo, useState } from "react";
 import { BannerAdSlot } from "../components/BannerAdSlot";
 import { EmojiBubble } from "../components/EmojiBubble";
+import { useRewardedAd } from "../hooks/useRewardedAd";
+import {
+  MIN_REDEEM_AMOUNT,
+  PROMOTION_ENABLED,
+  redeemToTossPoints,
+} from "../lib/promotion";
 import {
   AD_BONUS_MAX_PER_SLOT,
   formatHm,
@@ -12,6 +18,7 @@ import { useAppStore } from "../store/useAppStore";
 import {
   completedSlotCount,
   nextOpenSlotIndex,
+  redeemableAmount,
   totalEarnedToday,
   useDayStore,
   type SlotRecord,
@@ -25,6 +32,14 @@ export function HomeScreen() {
   const ensureToday = useDayStore((s) => s.ensureToday);
   const day = useDayStore((s) => s.day);
   const totals = useDayStore((s) => s.totals);
+  const applySlot = useDayStore((s) => s.applySlot);
+  const markRedeemed = useDayStore((s) => s.markRedeemed);
+
+  // 진입 즉시 보상형 광고 미리 로드 — CTA 클릭 시 대기 없이 바로 노출.
+  const ad = useRewardedAd();
+
+  const [redeeming, setRedeeming] = useState(false);
+  const [redeemError, setRedeemError] = useState<string | null>(null);
 
   // 1분마다 강제 리렌더 — 카운트다운 갱신
   const [now, setNow] = useState(() => nowMinuteOfDay());
@@ -57,10 +72,40 @@ export function HomeScreen() {
   const minutesUntilNext =
     nextSlot != null ? Math.max(0, nextSlot.targetMinute - now) : 0;
 
+  // CTA 클릭 → 즉시 광고 노출 → 보상 시 슬롯 적립 + 결과 화면 이동
   const handleApply = () => {
     if (!day || nextIdx < 0 || !isUnlocked) return;
-    trackClick("press_apply", { slot_index: nextIdx });
-    goToResult(nextIdx);
+    if (!ad.supported && !import.meta.env.DEV) return;
+    trackClick("press_apply", {
+      slot_index: nextIdx,
+      ad_state: ad.state,
+    });
+    ad.show(
+      () => {
+        applySlot(nextIdx);
+        goToResult(nextIdx);
+      },
+      () => {
+        // 광고 시청 미완료 — 그대로 home에 머무름. 사용자는 다시 시도 가능.
+        console.warn("[home] primary reward not earned");
+      },
+    );
+  };
+
+  const redeemable = redeemableAmount(totals);
+  const canRedeem = redeemable >= MIN_REDEEM_AMOUNT;
+  const handleRedeem = async () => {
+    if (redeeming || !canRedeem) return;
+    trackClick("press_redeem_toss_points", { amount: redeemable });
+    setRedeeming(true);
+    setRedeemError(null);
+    const res = await redeemToTossPoints(redeemable);
+    setRedeeming(false);
+    if (res.ok) {
+      markRedeemed(redeemable);
+    } else {
+      setRedeemError(res.message);
+    }
   };
 
   if (!day) {
@@ -72,6 +117,15 @@ export function HomeScreen() {
   }
 
   const allDone = nextIdx < 0;
+  const adBusy = ad.state === "showing";
+  const ctaLabel = (() => {
+    if (allDone) return "오늘 다 발랐어요 ✨";
+    if (!isUnlocked) return `${formatRemaining(minutesUntilNext)} 남았어요`;
+    if (adBusy) return "광고 보는 중…";
+    if (ad.state === "loading") return "광고 준비 중… 눌러도 곧 시작돼요";
+    if (!ad.supported) return "광고 미지원 환경";
+    return "광고 보고 피부 보호하기";
+  })();
 
   return (
     <div style={{ paddingBottom: 140 }}>
@@ -97,6 +151,16 @@ export function HomeScreen() {
           nextSlot={nextSlot}
           slotIndex={nextIdx}
         />
+
+        {PROMOTION_ENABLED && redeemable > 0 && (
+          <RedeemCard
+            amount={redeemable}
+            canRedeem={canRedeem}
+            loading={redeeming}
+            errorMessage={redeemError}
+            onRedeem={handleRedeem}
+          />
+        )}
 
         <h3
           style={{
@@ -138,13 +202,15 @@ export function HomeScreen() {
           size="xlarge"
           display="block"
           onClick={handleApply}
-          disabled={!isUnlocked || allDone}
+          disabled={
+            !isUnlocked ||
+            allDone ||
+            adBusy ||
+            (!ad.supported && !import.meta.env.DEV)
+          }
+          loading={adBusy}
         >
-          {allDone
-            ? "오늘 다 발랐어요 ✨"
-            : isUnlocked
-              ? "광고 보고 피부 보호하기"
-              : `${formatRemaining(minutesUntilNext)} 남았어요`}
+          {ctaLabel}
         </Button>
       </div>
     </div>
@@ -242,6 +308,103 @@ function NextCard({
           {isUnlocked ? "☀️" : "🧴"}
         </EmojiBubble>
       </div>
+    </div>
+  );
+}
+
+function RedeemCard({
+  amount,
+  canRedeem,
+  loading,
+  errorMessage,
+  onRedeem,
+}: {
+  amount: number;
+  canRedeem: boolean;
+  loading: boolean;
+  errorMessage: string | null;
+  onRedeem: () => void;
+}) {
+  const remaining = Math.max(0, MIN_REDEEM_AMOUNT - amount);
+  const progress = Math.min(1, amount / MIN_REDEEM_AMOUNT);
+
+  return (
+    <div
+      style={{
+        marginTop: 16,
+        background: canRedeem ? "#F0FDF4" : "#F8FAFC",
+        border: `1px solid ${canRedeem ? "#BBF7D0" : "#E2E8F0"}`,
+        borderRadius: 16,
+        padding: 18,
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+      }}
+    >
+      <EmojiBubble size={44} background="#FFFFFF">
+        💰
+      </EmojiBubble>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: "#0F172A",
+            marginBottom: 4,
+          }}
+        >
+          토스 포인트로 받기
+        </div>
+        {canRedeem ? (
+          <div style={{ fontSize: 13, color: "#16A34A", fontWeight: 600 }}>
+            {amount}원 교환 가능
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                fontSize: 12,
+                color: "#64748B",
+                marginBottom: 6,
+              }}
+            >
+              {remaining}원 더 모으면 받을 수 있어요 ({amount}/
+              {MIN_REDEEM_AMOUNT}원)
+            </div>
+            <div
+              style={{
+                height: 4,
+                background: "#E2E8F0",
+                borderRadius: 999,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${progress * 100}%`,
+                  height: "100%",
+                  background: "#FF9B3C",
+                  transition: "width 240ms ease",
+                }}
+              />
+            </div>
+          </>
+        )}
+        {errorMessage && (
+          <div style={{ fontSize: 12, color: "#DC2626", marginTop: 4 }}>
+            {errorMessage}
+          </div>
+        )}
+      </div>
+      <Button
+        size="small"
+        color="primary"
+        onClick={onRedeem}
+        loading={loading}
+        disabled={loading || !canRedeem}
+      >
+        받기
+      </Button>
     </div>
   );
 }

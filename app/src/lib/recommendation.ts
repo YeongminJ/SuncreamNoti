@@ -97,13 +97,14 @@ export function guidanceText(
 
 /**
  * 시작 시각 + 간격 기준 자동 슬롯 생성.
- * 자외선 활성 시간대(~18:00)까지만 채우고, 회당 최대 6개로 제한.
+ * 자외선이 강한 낮 시간대(06–16시)까지만 채우고, 회당 최대 6개로 제한.
+ * 16시 이후는 UV가 약해 권장 대상에서 제외 — 온보딩 그리드 범위와도 일치.
  */
 export function recommendedSlotsFromStart(
   skinType: SkinType,
   environment: Environment,
   startMinute: number,
-  dayEndMinute = 18 * 60,
+  dayEndMinute = 16 * 60,
 ): number[] {
   const interval = recommendedIntervalMinutes(skinType, environment);
   const slots: number[] = [];
@@ -115,9 +116,16 @@ export function recommendedSlotsFromStart(
   return slots;
 }
 
-/** 회차별 기본 적립 (1→2원, 2→3원, 3→4원, 4→5원). */
+/**
+ * 회차별 기본 적립.
+ * - 1·2번째: 1원 (가벼운 시작)
+ * - 3번째 이후: 3원 (꾸준히 발랐을 때 보상)
+ *
+ * 운영비 제어를 위해 4·5·6번째 슬롯도 3원 고정. 광고 단가가 안정되면 상향 검토.
+ */
 export function baseRewardForIndex(index: number): number {
-  return 2 + index;
+  if (index <= 1) return 1;
+  return 3;
 }
 
 /** 광고 보너스 단가 + 회차당 최대 횟수. */

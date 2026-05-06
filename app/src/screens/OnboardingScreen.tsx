@@ -1,7 +1,7 @@
-import { appLogin } from "@apps-in-toss/web-framework";
 import { Button, Top } from "@toss/tds-mobile";
 import { useEffect, useMemo, useState } from "react";
 import { EmojiBubble } from "../components/EmojiBubble";
+import { LegalSheet, type LegalKind } from "../components/LegalSheet";
 import { getUserKey, loginWithToss, registerUser } from "../lib/api";
 import {
   formatHm,
@@ -13,6 +13,7 @@ import {
 } from "../lib/recommendation";
 import { trackClick, trackScreen } from "../lib/track";
 import { useAppStore } from "../store/useAppStore";
+import { useAuthStore } from "../store/useAuthStore";
 import { useProfileStore } from "../store/useProfileStore";
 
 const SKIN_TYPES: SkinType[] = ["I", "II", "III", "IV", "V_VI"];
@@ -40,6 +41,10 @@ export function OnboardingScreen() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [skinType, setSkinType] = useState<SkinType>("III");
   const [environment, setEnvironment] = useState<Environment>("outdoor");
+  // 알림 수신 동의 + 약관·개인정보 처리방침 동의. 둘 다 필수.
+  const [agreedNotification, setAgreedNotification] = useState(false);
+  const [agreedLegal, setAgreedLegal] = useState(false);
+  const [legalSheet, setLegalSheet] = useState<LegalKind | null>(null);
   // 사용자가 chip을 직접 토글하기 전엔 skin/env 변경에 따라 자동 갱신.
   // 토글하는 순간 hasCustomized=true → 그 이후엔 사용자 선택 보존.
   const [hasCustomized, setHasCustomized] = useState(false);
@@ -105,10 +110,13 @@ export function OnboardingScreen() {
 
   const submit = () => {
     if (sortedSlots.length === 0) return;
+    if (!agreedNotification || !agreedLegal) return;
     trackClick("press_onboarding_complete", {
       skin: skinType,
       env: environment,
       slots: sortedSlots.length,
+      agreedNotification,
+      agreedLegal,
     });
     setProfile({
       skinType,
@@ -131,32 +139,20 @@ export function OnboardingScreen() {
       });
       if (!reg.ok) return;
 
-      try {
-        const auth = await appLogin();
-        if (
-          !auth ||
-          typeof auth !== "object" ||
-          !("authorizationCode" in auth)
-        ) {
-          if (import.meta.env.DEV) {
-            console.debug(
-              "[onboarding] appLogin 미지원 환경 (브라우저 dev) — 스킵",
-            );
-          }
-          return;
-        }
-        if (import.meta.env.DEV) {
-          console.debug(
-            "[onboarding] appLogin 인가코드 획득, 서버 교환 시작",
-          );
-        }
-        await loginWithToss({
-          userKey,
-          authorizationCode: auth.authorizationCode,
-          referrer: auth.referrer,
-        });
-      } catch (err) {
-        console.warn("[onboarding] toss login flow failed", err);
+      // 진입 시점(App.tsx)에서 받아둔 토스 인가코드를 재사용.
+      // 토스 환경이 아니거나 사용자가 거부한 경우엔 스킵.
+      const { authorizationCode, referrer, tossUserKey } =
+        useAuthStore.getState();
+      if (!authorizationCode || !referrer) return;
+      if (tossUserKey != null) return;
+
+      const result = await loginWithToss({
+        userKey,
+        authorizationCode,
+        referrer,
+      });
+      if (result.ok && typeof result.tossUserKey === "number") {
+        useAuthStore.getState().setTossUserKey(result.tossUserKey);
       }
     })();
 
@@ -405,9 +401,41 @@ export function OnboardingScreen() {
                 )}
               </div>
             )}
+
+            {/* 동의 영역 — 알림 수신 + 약관·개인정보 (모두 필수) */}
+            <div style={{ marginTop: 24 }}>
+              <ConsentRow
+                checked={agreedNotification}
+                onToggle={() => setAgreedNotification((v) => !v)}
+                label="선크림 알림 수신 동의"
+                required
+              />
+              <ConsentRow
+                checked={agreedLegal}
+                onToggle={() => setAgreedLegal((v) => !v)}
+                label="이용약관 · 개인정보 처리방침 동의"
+                required
+                links={[
+                  {
+                    label: "이용약관",
+                    onClick: () => setLegalSheet("terms"),
+                  },
+                  {
+                    label: "개인정보",
+                    onClick: () => setLegalSheet("privacy"),
+                  },
+                ]}
+              />
+            </div>
           </Section>
         )}
       </div>
+
+      <LegalSheet
+        open={legalSheet != null}
+        kind={legalSheet}
+        onClose={() => setLegalSheet(null)}
+      />
 
       <div
         style={{
@@ -445,12 +473,105 @@ export function OnboardingScreen() {
             size="xlarge"
             display="block"
             onClick={submit}
-            disabled={selectedSlots.size === 0}
+            disabled={
+              selectedSlots.size === 0 || !agreedNotification || !agreedLegal
+            }
           >
             시작하기
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+function ConsentRow({
+  checked,
+  onToggle,
+  label,
+  required,
+  links,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  label: string;
+  required?: boolean;
+  links?: { label: string; onClick: () => void }[];
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "12px 4px",
+      }}
+    >
+      <button
+        onClick={onToggle}
+        aria-pressed={checked}
+        style={{
+          width: 22,
+          height: 22,
+          flexShrink: 0,
+          borderRadius: 6,
+          border: `2px solid ${checked ? "#FF9B3C" : "#CBD5E1"}`,
+          background: checked ? "#FF9B3C" : "#FFFFFF",
+          color: "#FFFFFF",
+          fontSize: 14,
+          fontWeight: 700,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 0,
+          WebkitTapHighlightColor: "transparent",
+          WebkitAppearance: "none",
+          appearance: "none",
+          outline: "none",
+          transition: "background 120ms ease, border-color 120ms ease",
+        }}
+      >
+        {checked ? "✓" : ""}
+      </button>
+      <div
+        style={{
+          flex: 1,
+          fontSize: 14,
+          color: "#0F172A",
+          fontWeight: 500,
+          cursor: "pointer",
+        }}
+        onClick={onToggle}
+      >
+        {label}
+        {required && (
+          <span style={{ color: "#FF9B3C", marginLeft: 4 }}>(필수)</span>
+        )}
+      </div>
+      {links && (
+        <div style={{ display: "flex", gap: 12 }}>
+          {links.map((l) => (
+            <button
+              key={l.label}
+              onClick={l.onClick}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#64748B",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                textDecoration: "underline",
+                padding: 0,
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

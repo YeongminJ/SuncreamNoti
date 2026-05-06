@@ -11,12 +11,12 @@ import { useAppStore } from "../store/useAppStore";
 import { useDayStore } from "../store/useDayStore";
 
 /**
- * 적립은 광고를 봤을 때만 발생해요.
+ * 결과(적립 완료) + 보너스 광고 화면.
  *
- * - 진입 시 자동 적립 X — 슬롯은 아직 미완료 상태.
- * - 첫 광고 시청: 기본 적립금(2/3/4원) 지급 + 슬롯 완료 처리.
- * - 추가 광고 시청: +1원 보너스 (회차당 최대 AD_BONUS_MAX_PER_SLOT회).
- * - 광고를 보지 않고 닫으면 적립 없음. 다음에 다시 시도 가능.
+ * - 첫 광고 시청은 [HomeScreen](./HomeScreen.tsx) CTA에서 즉시 처리되고,
+ *   적립이 끝난 직후에 이 화면으로 이동해와요. 즉 진입 시점엔 항상 `applied=true`.
+ * - 추가 광고 시청: +1원 보너스 (회차당 최대 `AD_BONUS_MAX_PER_SLOT`회).
+ * - 안전장치로 `applied=false`로 직접 진입한 케이스에 대해서만 fallback CTA 노출.
  */
 export function ApplyResultScreen() {
   const slotIndex = useAppStore((s) => s.resultSlotIndex);
