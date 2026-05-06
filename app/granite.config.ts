@@ -5,8 +5,8 @@ export default defineConfig({
   brand: {
     displayName: "선크림 알림",
     primaryColor: "#FF9B3C",
-    // 콘솔에 업로드한 동일한 600×600 로고. public/에 두면 빌드 시 정적 자산으로 번들돼요.
-    icon: "/icon.png",
+    // 콘솔에 업로드한 600×600 로고의 Toss CDN URL — 콘솔과 완전히 동일한 이미지를 참조해요.
+    icon: "https://static.toss.im/appsintoss/36039/e4b4e8b1-5fa1-4c28-9458-33bcaf3688a0.png",
   },
   web: {
     // 실기기 샌드박스에서 이 값을 참조해요. Wi-Fi가 바뀌면 현재 Mac LAN IP로
