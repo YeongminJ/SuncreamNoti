@@ -2,6 +2,7 @@ import { Button, Top } from "@toss/tds-mobile";
 import { useEffect, useMemo, useState } from "react";
 import { BannerAdSlot } from "../components/BannerAdSlot";
 import { EmojiBubble } from "../components/EmojiBubble";
+import { UvIndicator } from "../components/UvIndicator";
 import { useRewardedAd } from "../hooks/useRewardedAd";
 import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
 import {
@@ -186,6 +187,7 @@ export function HomeScreen() {
           ))}
         </div>
 
+        <UvIndicator />
         <BannerAdSlot />
       </div>
 
