@@ -127,28 +127,20 @@ export function useUvIndex(): UvState {
 
   const requestUserLocation = useCallback(async () => {
     if (typeof getCurrentLocation !== "function") return;
+    // 옵티미스틱: 사용자가 클릭한 순간 라벨/버튼 즉시 갱신.
+    // 좌표 응답이 늦거나 부분 실패해도 사용자 의사 (내 위치)는 존중.
+    setCoords((prev) => ({ ...prev, isUser: true }));
     try {
-      // SDK 응답 구조가 환경마다 다를 수 있어 안전하게 파싱
-      const result = (await getCurrentLocation({
+      const result = await getCurrentLocation({
         accuracy: Accuracy.Balanced,
-      })) as unknown;
-      if (!result || result === "ERROR") return;
-      const obj = result as Record<string, unknown> & {
-        coords?: { latitude?: unknown; longitude?: unknown };
-      };
-      const lat =
-        (obj.coords && typeof obj.coords.latitude === "number"
-          ? obj.coords.latitude
-          : null) ??
-        (typeof obj.latitude === "number" ? obj.latitude : null);
-      const lon =
-        (obj.coords && typeof obj.coords.longitude === "number"
-          ? obj.coords.longitude
-          : null) ??
-        (typeof obj.longitude === "number" ? obj.longitude : null);
-      if (typeof lat !== "number" || typeof lon !== "number") return;
-      setCoords({ lat, lon, isUser: true });
+      });
+      const lat = result?.coords?.latitude;
+      const lon = result?.coords?.longitude;
+      if (typeof lat === "number" && typeof lon === "number") {
+        setCoords({ lat, lon, isUser: true });
+      }
     } catch (err) {
+      // 실패해도 isUser=true 유지 (버튼 다시 안 뜨도록). 좌표는 서울 기본.
       console.warn("[uv] getCurrentLocation failed", err);
     }
   }, []);
