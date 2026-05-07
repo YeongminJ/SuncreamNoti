@@ -9,7 +9,7 @@ import { grantPromotionReward } from "@apps-in-toss/web-framework";
  *
  * 가이드: https://developers-apps-in-toss.toss.im/promotion/develop.md
  */
-const PROD_PROMOTION_CODE: string = "01KQXNKS1CZSRNJJDF3S96S9BS";
+const PROD_PROMOTION_CODE: string = "TEST_01KQXNKS1CZSRNJJDF3S96S9BS";
 
 /** 토스 포인트 교환 최소 금액(원). 잔돈 단위 호출을 막아 운영비용을 줄여요. */
 export const MIN_REDEEM_AMOUNT = 10;
