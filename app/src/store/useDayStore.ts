@@ -128,6 +128,7 @@ export const useDayStore = create<DayState>((set, get) => ({
       lastActiveDate: day.date,
       // 첫 발림이면 streak 갱신
       streak: dateChanged && isFirstApplyToday ? totals.streak + 1 : totals.streak,
+      redeemedReward: totals.redeemedReward,
     };
     writeJSON(TOTALS_KEY, updatedTotals);
 
