@@ -68,14 +68,27 @@ interface DayState {
   reset: () => void;
 }
 
+/**
+ * Totals 로드 + 마이그레이션. 옛 버전엔 `redeemedReward` 필드가 없어서
+ * 그대로 읽으면 undefined가 되고 redeemableAmount가 NaN을 반환해
+ * 포인트 전환 카드가 안 보이는 사고가 있었어요. 모든 필드 default 채워서 반환.
+ */
+function loadTotals(): Totals {
+  const raw = readJSON<Partial<Totals>>(TOTALS_KEY, {});
+  return {
+    lifetimeReward:
+      typeof raw.lifetimeReward === "number" ? raw.lifetimeReward : 0,
+    redeemedReward:
+      typeof raw.redeemedReward === "number" ? raw.redeemedReward : 0,
+    lastActiveDate:
+      typeof raw.lastActiveDate === "string" ? raw.lastActiveDate : null,
+    streak: typeof raw.streak === "number" ? raw.streak : 0,
+  };
+}
+
 export const useDayStore = create<DayState>((set, get) => ({
   day: readJSON<DayRecord | null>(dayStorageKey(todayKey()), null),
-  totals: readJSON<Totals>(TOTALS_KEY, {
-    lifetimeReward: 0,
-    redeemedReward: 0,
-    lastActiveDate: null,
-    streak: 0,
-  }),
+  totals: loadTotals(),
 
   ensureToday: (slotMinutes) => {
     const date = todayKey();
@@ -187,9 +200,13 @@ export const useDayStore = create<DayState>((set, get) => ({
   },
 }));
 
-/** 아직 토스 포인트로 교환하지 않은 잔여 적립금. */
+/** 아직 토스 포인트로 교환하지 않은 잔여 적립금. NaN/undefined 방어 포함. */
 export function redeemableAmount(totals: Totals): number {
-  return Math.max(0, totals.lifetimeReward - totals.redeemedReward);
+  const earned =
+    typeof totals.lifetimeReward === "number" ? totals.lifetimeReward : 0;
+  const redeemed =
+    typeof totals.redeemedReward === "number" ? totals.redeemedReward : 0;
+  return Math.max(0, earned - redeemed);
 }
 
 /** 가장 빨리 발려야 하는 미완료 슬롯 인덱스. 모두 끝났으면 -1. */
