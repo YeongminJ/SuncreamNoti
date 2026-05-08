@@ -16,7 +16,32 @@ const loginSchema = z.object({
   referrer: z.enum(["DEFAULT", "SANDBOX"]),
 });
 
+const statusSchema = z.object({
+  userKey: z.string().min(1).max(200),
+});
+
 const route = new Hono<{ Bindings: Env }>();
+
+/**
+ * 클라가 진입 시점에 매핑 여부를 사전 조회.
+ * `tossUserKey`가 이미 있으면 클라는 `appLogin` 호출 없이 바로 라우팅 진행.
+ *
+ * 응답:
+ * - 매핑 안됨 또는 사용자 row 없음 → `{ tossUserKey: null }`
+ * - 매핑됨 → `{ tossUserKey: number }`
+ */
+route.post("/status", zValidator("json", statusSchema), async (c) => {
+  const body = c.req.valid("json");
+  const db = getDb(c.env.DB);
+  const u = await db
+    .select({ tossUserKey: users.tossUserKey })
+    .from(users)
+    .where(eq(users.userKey, body.userKey))
+    .get();
+  return c.json({
+    tossUserKey: u?.tossUserKey ?? null,
+  });
+});
 
 /**
  * 토스 로그인 인가코드를 받아서:

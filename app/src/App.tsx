@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { DevResetButton } from "./components/DevResetButton";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LoadingSplash } from "./components/LoadingSplash";
-import { getUserKey, loginWithToss } from "./lib/api";
+import { fetchAuthStatus, getUserKey, loginWithToss } from "./lib/api";
 import { ApplyResultScreen } from "./screens/ApplyResultScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { OnboardingScreen } from "./screens/OnboardingScreen";
@@ -20,13 +20,40 @@ function App() {
   const profile = useProfileStore((s) => s.profile);
   const authStatus = useAuthStore((s) => s.status);
 
-  // 1단계: 진입 즉시 토스 로그인 시도. 모든 사용자가 같은 시점에 거치는 게이트.
+  // 1단계: 진입 즉시 매핑 사전 조회 → 미매핑 사용자만 토스 로그인 호출.
+  // 이미 매핑된 재방문자는 OAuth 2단계 + 토스 동의 화면을 거치지 않고 바로 라우팅.
   useEffect(() => {
     if (useAuthStore.getState().status !== "idle") return;
     const auth = useAuthStore.getState();
     auth.setPending();
 
     void (async () => {
+      // 1) 매핑 여부 사전 조회 — 서버 한 번만 보고 결정
+      try {
+        const localUserKey = await getUserKey();
+        if (localUserKey) {
+          const status = await fetchAuthStatus(localUserKey);
+          if (typeof status.tossUserKey === "number") {
+            // 이미 매핑됨 → store 채우고 appLogin 스킵
+            useAuthStore.getState().setTossUserKey(status.tossUserKey);
+            useAuthStore.getState().setSkipped();
+            if (import.meta.env.DEV) {
+              console.debug(
+                "[app] already mapped, skip appLogin",
+                status.tossUserKey,
+              );
+            }
+            return;
+          }
+        }
+      } catch (err) {
+        // 사전 조회 실패는 fall-through로 appLogin 시도
+        if (import.meta.env.DEV) {
+          console.debug("[app] auth status check failed, fall through", err);
+        }
+      }
+
+      // 2) 미매핑 사용자 → appLogin 호출 (기존 흐름)
       try {
         const result = await appLogin();
         if (

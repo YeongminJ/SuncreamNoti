@@ -104,6 +104,30 @@ export async function unregisterUser(
 }
 
 /**
+ * 진입 시점에 사용자 매핑 여부 사전 조회.
+ * 매핑돼있으면 클라는 `appLogin` 호출 없이 라우팅 진행 — 매 진입마다 OAuth 2단계 호출 회피.
+ */
+export async function fetchAuthStatus(
+  userKey: string,
+): Promise<{ tossUserKey: number | null }> {
+  try {
+    const res = await fetch(`${API_URL}/api/auth/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userKey }),
+    });
+    if (!res.ok) return { tossUserKey: null };
+    const data = (await res.json()) as { tossUserKey?: unknown };
+    return {
+      tossUserKey:
+        typeof data.tossUserKey === "number" ? data.tossUserKey : null,
+    };
+  } catch {
+    return { tossUserKey: null };
+  }
+}
+
+/**
  * 토스 로그인 인가코드 + referrer를 서버에 보내서 numeric tossUserKey 획득·저장.
  * 푸시 알림(스마트 발송) 활성화 전제.
  *
