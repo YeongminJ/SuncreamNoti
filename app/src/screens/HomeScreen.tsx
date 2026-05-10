@@ -119,12 +119,12 @@ export function HomeScreen() {
   }
 
   const allDone = nextIdx < 0;
-  const adBusy = ad.state === "showing";
+  const adBusy = ad.state === "showing" || ad.state === "loading";
   const ctaLabel = (() => {
     if (allDone) return "오늘 다 발랐어요 ✨";
     if (!isUnlocked) return `${formatRemaining(minutesUntilNext)} 남았어요`;
-    if (adBusy) return "광고 보는 중…";
-    if (ad.state === "loading") return "광고 준비 중… 눌러도 곧 시작돼요";
+    if (ad.state === "loading") return "광고 준비 중…";
+    if (ad.state === "showing") return "광고 보는 중…";
     if (!ad.supported) return "광고 미지원 환경";
     return "광고 보고 피부 보호하기";
   })();

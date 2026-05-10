@@ -25,12 +25,7 @@ function resolveAdGroupId(): { id: string; isTest: boolean } {
   return { id: PROD_AD_GROUP_ID, isTest: false };
 }
 
-export type AdState =
-  | "unsupported"
-  | "loading"
-  | "ready"
-  | "showing"
-  | "error";
+export type AdState = "idle" | "loading" | "showing" | "unsupported" | "error";
 
 function safeIsSupported(
   fn: { isSupported?: () => boolean } | undefined,
@@ -62,122 +57,40 @@ function sdkIsAvailable(): boolean {
   );
 }
 
+/**
+ * 보상형 광고 hook — on-demand 로딩 방식.
+ *
+ * 마운트 시점에는 광고를 미리 로드하지 않아요. 사용자가 `show()`를 호출한
+ * 시점에 `loadFullScreenAd`를 호출하고, `loaded` 이벤트가 오면 곧바로
+ * `showFullScreenAd`로 이어서 표시해요. 진행 중일 때 중복 호출은 무시돼요.
+ */
 export function useRewardedAd() {
-  const [state, setState] = useState<AdState>(() =>
-    sdkIsAvailable() ? "loading" : import.meta.env.DEV ? "ready" : "unsupported",
-  );
+  const [state, setState] = useState<AdState>(() => {
+    if (sdkIsAvailable()) return "idle";
+    return import.meta.env.DEV ? "idle" : "unsupported";
+  });
   const [adGroupInfo] = useState(() => resolveAdGroupId());
   const adGroupId = adGroupInfo.id;
-  const pendingShowRef = useRef<{
-    onRewarded: () => void;
-    onFailed?: () => void;
-  } | null>(null);
+  // 진행 중인 load의 unregister + 중복 클릭 방지
+  const inFlightRef = useRef<{ unregister?: () => void } | null>(null);
 
-  const showLoadedAd = useCallback(
-    (onRewarded: () => void, onFailed?: () => void) => {
-      if (!safeIsSupported(showFullScreenAd)) {
-        onFailed?.();
-        return;
-      }
-      setState("showing");
-      let settled = false;
-      let earned = false;
-      const preloadNext = () => {
-        if (!sdkIsAvailable()) return;
-        safeCall(loadFullScreenAd, {
-          options: { adGroupId },
-          onEvent: (e) => {
-            if (e.type === "loaded") setState("ready");
-          },
-          onError: () => setState("error"),
-        });
-      };
-      const result = safeCall(showFullScreenAd, {
-        options: { adGroupId },
-        onEvent: (event) => {
-          switch (event.type) {
-            case "userEarnedReward":
-              earned = true;
-              break;
-            case "dismissed":
-              setState("loading");
-              preloadNext();
-              if (settled) break;
-              settled = true;
-              if (earned) onRewarded();
-              else onFailed?.();
-              break;
-            case "failedToShow":
-              setState("loading");
-              preloadNext();
-              if (settled) break;
-              settled = true;
-              onFailed?.();
-              break;
-          }
-        },
-        onError: (err) => {
-          console.warn("[ad] show failed", err);
-          setState("error");
-          if (settled) return;
-          settled = true;
-          onFailed?.();
-        },
-      });
-      if (result === null) {
-        setState("unsupported");
-        if (!settled) {
-          settled = true;
-          onFailed?.();
-        }
-      }
-    },
-    [adGroupId],
-  );
-
+  // 언마운트 시 진행 중인 load 핸들러 해제
   useEffect(() => {
-    if (!sdkIsAvailable()) {
-      setState("unsupported");
-      return;
-    }
-    setState("loading");
-    const unregister = safeCall(loadFullScreenAd, {
-      options: { adGroupId },
-      onEvent: (event) => {
-        if (event.type === "loaded") {
-          setState("ready");
-          const pending = pendingShowRef.current;
-          if (pending) {
-            pendingShowRef.current = null;
-            showLoadedAd(pending.onRewarded, pending.onFailed);
-          }
-        }
-      },
-      onError: (err) => {
-        console.warn("[ad] load failed", err);
-        setState("error");
-        const pending = pendingShowRef.current;
-        pendingShowRef.current = null;
-        pending?.onFailed?.();
-      },
-    });
-    if (unregister === null) {
-      setState("unsupported");
-      return;
-    }
-    return () => unregister();
-  }, [adGroupId, showLoadedAd]);
+    return () => {
+      inFlightRef.current?.unregister?.();
+      inFlightRef.current = null;
+    };
+  }, []);
 
   const show = useCallback(
     (onRewarded: () => void, onFailed?: () => void) => {
+      // SDK 미지원 환경: dev는 시뮬레이션, prod는 실패 처리
       if (!sdkIsAvailable()) {
-        // Dev / 브라우저 환경: 광고 SDK가 없을 때 흐름을 검증할 수 있도록
-        // 600ms 후 보상 시뮬레이션. 실기기·샌드박스에서는 이 분기를 타지 않아요.
         if (import.meta.env.DEV) {
           console.debug("[ad] DEV simulate rewarded after 600ms");
           setState("showing");
           window.setTimeout(() => {
-            setState("ready");
+            setState("idle");
             onRewarded();
           }, 600);
           return;
@@ -185,22 +98,87 @@ export function useRewardedAd() {
         onFailed?.();
         return;
       }
-      if (state === "ready") {
-        showLoadedAd(onRewarded, onFailed);
+
+      // 이미 진행 중이면 중복 호출 무시 (사용자 빠른 더블탭 방지)
+      if (inFlightRef.current) return;
+
+      setState("loading");
+      let settled = false;
+      let earned = false;
+
+      const cleanup = () => {
+        inFlightRef.current?.unregister?.();
+        inFlightRef.current = null;
+      };
+
+      const finishWith = (rewarded: boolean) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (rewarded) onRewarded();
+        else onFailed?.();
+      };
+
+      const showLoadedAd = () => {
+        setState("showing");
+        const result = safeCall(showFullScreenAd, {
+          options: { adGroupId },
+          onEvent: (event) => {
+            switch (event.type) {
+              case "userEarnedReward":
+                earned = true;
+                break;
+              case "dismissed":
+                setState("idle");
+                finishWith(earned);
+                break;
+              case "failedToShow":
+                setState("idle");
+                finishWith(false);
+                break;
+            }
+          },
+          onError: (err) => {
+            console.warn("[ad] show failed", err);
+            setState("error");
+            finishWith(false);
+          },
+        });
+        if (result === null) {
+          setState("unsupported");
+          finishWith(false);
+        }
+      };
+
+      // 클릭 시점에 load 시작 → loaded 받으면 즉시 show
+      const unregister = safeCall(loadFullScreenAd, {
+        options: { adGroupId },
+        onEvent: (event) => {
+          if (event.type === "loaded") {
+            showLoadedAd();
+          }
+        },
+        onError: (err) => {
+          console.warn("[ad] load failed", err);
+          setState("error");
+          finishWith(false);
+        },
+      });
+
+      if (unregister === null) {
+        setState("unsupported");
+        finishWith(false);
         return;
       }
-      if (state === "loading") {
-        pendingShowRef.current = { onRewarded, onFailed };
-        return;
-      }
-      onFailed?.();
+
+      inFlightRef.current = { unregister: unregister as () => void };
     },
-    [state, showLoadedAd],
+    [adGroupId],
   );
 
   return {
     state,
-    ready: state === "ready",
+    ready: state === "idle",
     loading: state === "loading",
     supported: state !== "unsupported",
     isTest: adGroupInfo.isTest,
