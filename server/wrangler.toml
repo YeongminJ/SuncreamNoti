@@ -7,9 +7,8 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 TOSS_MODE = "real"
 TOSS_BASE_URL = "https://apps-in-toss-api.toss.im"
-# 콘솔에서 등록한 메시지 템플릿 코드 — 등록 후 wrangler secret으로 주입 권장.
-# 우선 placeholder; 실제 발송 시 secret/PROD 값으로 교체.
-TOSS_TEMPLATE_SET_CODE = "PLACEHOLDER_TEMPLATE_CODE"
+# 콘솔에서 등록한 메시지 템플릿 코드 (기능성 푸시 승인 v2).
+TOSS_TEMPLATE_SET_CODE = "dailysuncream-remind_v2"
 
 # D1 (SQLite) 바인딩.
 # 처음 셋업 시 `wrangler d1 create suncream-noti-db`로 만든 뒤 출력된
