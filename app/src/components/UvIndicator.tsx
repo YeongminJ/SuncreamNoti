@@ -54,36 +54,36 @@ export function UvIndicator() {
         <span
           style={{
             fontSize: 11,
-            color: "#94A3B8",
+            color: isUserLocation ? "#2563EB" : "#94A3B8",
+            fontWeight: isUserLocation ? 700 : 400,
             marginLeft: 4,
             whiteSpace: "nowrap",
           }}
         >
+          {isUserLocation ? "📍 " : ""}
           {locationLabel}
         </span>
       </div>
 
-      {!isUserLocation && (
-        <button
-          onClick={requestUserLocation}
-          disabled={loading}
-          style={{
-            background: "transparent",
-            border: "none",
-            padding: "4px 8px",
-            color: "#64748B",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-            WebkitTapHighlightColor: "transparent",
-            outline: "none",
-            whiteSpace: "nowrap",
-            opacity: loading ? 0.5 : 1,
-          }}
-        >
-          내 위치로 보기 ›
-        </button>
-      )}
+      <button
+        onClick={requestUserLocation}
+        disabled={loading}
+        style={{
+          background: "transparent",
+          border: "none",
+          padding: "4px 8px",
+          color: "#64748B",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+          outline: "none",
+          whiteSpace: "nowrap",
+          opacity: loading ? 0.5 : 1,
+        }}
+      >
+        {isUserLocation ? "새로고침" : "내 위치로 보기 ›"}
+      </button>
     </div>
   );
 }

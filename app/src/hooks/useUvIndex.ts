@@ -18,10 +18,13 @@ const DEFAULT_LAT = 37.5665;
 const DEFAULT_LON = 126.978;
 const SEOUL_LABEL = "서울 기준";
 const USER_LABEL = "내 위치";
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1시간
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1시간 — UV 값 캐시
 const CACHE_KEY_PREFIX = "sunalarm.uv.v1";
-/** "이 사용자는 위치 권한을 한 번 동의했음" 영속 플래그. 좌표 자체는 매번 fresh로 받음. */
+/** "이 사용자는 위치 권한을 한 번 동의했음" 영속 플래그. */
 const LOCATION_GRANTED_KEY = "sunalarm.uv.locationGranted.v1";
+/** 좌표 캐시 — 토스 SDK getCurrentLocation 재호출 줄여서 권한 모달 반복 방지. */
+const COORDS_CACHE_KEY = "sunalarm.uv.coords.v1";
+const COORDS_CACHE_TTL_MS = 30 * 60 * 1000; // 30분
 
 function readGrantedFlag(): boolean {
   try {
@@ -38,6 +41,41 @@ function writeGrantedFlag(granted: boolean): void {
     } else {
       window.localStorage.removeItem(LOCATION_GRANTED_KEY);
     }
+  } catch {
+    // ignore
+  }
+}
+
+interface CoordsCacheEntry {
+  lat: number;
+  lon: number;
+  ts: number;
+}
+
+function readCoordsCache(): CoordsCacheEntry | null {
+  try {
+    const raw = window.localStorage.getItem(COORDS_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw) as CoordsCacheEntry;
+    if (
+      typeof c.lat !== "number" ||
+      typeof c.lon !== "number" ||
+      typeof c.ts !== "number"
+    )
+      return null;
+    if (Date.now() - c.ts > COORDS_CACHE_TTL_MS) return null;
+    return c;
+  } catch {
+    return null;
+  }
+}
+
+function writeCoordsCache(lat: number, lon: number): void {
+  try {
+    window.localStorage.setItem(
+      COORDS_CACHE_KEY,
+      JSON.stringify({ lat, lon, ts: Date.now() }),
+    );
   } catch {
     // ignore
   }
@@ -140,26 +178,32 @@ async function fetchCurrentCoords(): Promise<{
 }
 
 export function useUvIndex(): UvState {
-  // 이전 동의 이력이 있으면 isUser=true로 시작 (라벨/버튼 즉시 반영)
-  // 좌표는 일단 서울로 두고, 마운트 후 useEffect에서 fresh 좌표로 덮어씀
+  // 이전 동의 이력 + 캐시된 좌표가 있으면 그걸로 즉시 시작 (권한 모달 안 뜸).
+  // 캐시 없으면 서울 좌표로 시작하고, 마운트 후 fresh 좌표 fetch.
   const [coords, setCoords] = useState<{
     lat: number;
     lon: number;
     isUser: boolean;
-  }>(() => ({
-    lat: DEFAULT_LAT,
-    lon: DEFAULT_LON,
-    isUser: readGrantedFlag(),
-  }));
+  }>(() => {
+    const cached = readCoordsCache();
+    const granted = readGrantedFlag();
+    if (granted && cached) {
+      return { lat: cached.lat, lon: cached.lon, isUser: true };
+    }
+    return { lat: DEFAULT_LAT, lon: DEFAULT_LON, isUser: granted };
+  });
   const [uv, setUv] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 진입 시 권한 동의 이력 있으면 fresh 좌표 자동 요청
+  // 진입 시 동의 이력 있는데 좌표 캐시 만료된 경우만 SDK 호출.
+  // 캐시 살아있으면 fetch 안 함 → 권한 모달 반복 노출 방지.
   useEffect(() => {
     if (!readGrantedFlag()) return;
+    if (readCoordsCache()) return;
     let alive = true;
     void fetchCurrentCoords().then((c) => {
       if (!alive || !c) return;
+      writeCoordsCache(c.lat, c.lon);
       setCoords({ lat: c.lat, lon: c.lon, isUser: true });
     });
     return () => {
@@ -195,6 +239,7 @@ export function useUvIndex(): UvState {
     setCoords((prev) => ({ ...prev, isUser: true }));
     const c = await fetchCurrentCoords();
     if (c) {
+      writeCoordsCache(c.lat, c.lon);
       setCoords({ lat: c.lat, lon: c.lon, isUser: true });
       writeGrantedFlag(true);
     }
