@@ -1,5 +1,6 @@
 import { Button, Top } from "@toss/tds-mobile";
 import { useEffect } from "react";
+import { AdLoadingOverlay } from "../components/AdLoadingOverlay";
 import { EmojiBubble } from "../components/EmojiBubble";
 import { useRewardedAd } from "../hooks/useRewardedAd";
 import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
@@ -75,6 +76,7 @@ export function ApplyResultScreen() {
 
   return (
     <div style={{ paddingBottom: 140 }}>
+      <AdLoadingOverlay open={ad.state === "loading"} />
       <Top
         title={
           <Top.TitleParagraph size={28}>

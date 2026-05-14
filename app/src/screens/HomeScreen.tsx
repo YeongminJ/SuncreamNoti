@@ -1,5 +1,6 @@
 import { Button, Top } from "@toss/tds-mobile";
 import { useEffect, useMemo, useState } from "react";
+import { AdLoadingOverlay } from "../components/AdLoadingOverlay";
 import { BannerAdSlot } from "../components/BannerAdSlot";
 import { EmojiBubble } from "../components/EmojiBubble";
 import { UvIndicator } from "../components/UvIndicator";
@@ -132,6 +133,7 @@ export function HomeScreen() {
 
   return (
     <div style={{ paddingBottom: 140 }}>
+      <AdLoadingOverlay open={ad.state === "loading"} />
       <Top
         title={
           <Top.TitleParagraph size={28}>
