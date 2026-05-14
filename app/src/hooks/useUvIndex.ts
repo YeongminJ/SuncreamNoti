@@ -230,16 +230,14 @@ export interface UvState {
 }
 
 /**
- * 토스 SDK 권한 플로우 → 좌표 반환.
+ * 토스 SDK로 좌표 받기.
  *
- * SDK 동작 특성상 `getCurrentLocation({...})`만 직접 호출하면
- * 권한 모달은 부수효과로 뜨지만 promise는 사용자 응답 전에 reject돼서
- * "허용"을 눌러도 좌표를 못 받는 케이스가 발생함.
+ * SDK가 `createPermissionFunction`으로 감싸여 있어서, `getCurrentLocation(...)`
+ * 호출 한 번에 권한 요청 모달 노출 + 사용자 응답 대기 + 좌표 fetch까지 모두 처리됨.
  *
- * 그래서 다음 순서로 처리:
- *   1) getPermission()으로 현재 권한 상태 확인
- *   2) 미허용이면 openPermissionDialog()로 모달 띄우고 사용자 응답까지 대기
- *   3) 허용된 경우에만 getCurrentLocation({...}) 호출
+ * 거부되면 SDK 내부에서 throw, 허용되면 좌표 반환. 따로 getPermission /
+ * openPermissionDialog 호출하면 모달이 두 번 뜨거나 응답 매칭 안 맞아서
+ * 좌표를 못 받는 케이스 발생 — 그래서 SDK가 시키는 대로 호출 한 번만.
  *
  * 실패/거부면 null. 호출자에서 fallback 처리.
  */
@@ -247,22 +245,25 @@ async function fetchCurrentCoords(): Promise<{
   lat: number;
   lon: number;
 } | null> {
-  if (typeof getCurrentLocation !== "function") return null;
+  if (typeof getCurrentLocation !== "function") {
+    console.warn("[uv] getCurrentLocation not available");
+    return null;
+  }
   try {
-    let permission: string = await getCurrentLocation.getPermission();
-    if (permission !== "granted") {
-      permission = await getCurrentLocation.openPermissionDialog();
-    }
-    if (permission !== "granted") return null;
-
+    console.debug("[uv] requesting location...");
     const result = await getCurrentLocation({ accuracy: Accuracy.Balanced });
+    console.debug("[uv] location result", JSON.stringify(result));
     const lat = result?.coords?.latitude;
     const lon = result?.coords?.longitude;
     if (typeof lat === "number" && typeof lon === "number") {
       return { lat, lon };
     }
+    console.warn("[uv] coords missing in result", result);
   } catch (err) {
-    console.warn("[uv] getCurrentLocation failed", err);
+    console.warn(
+      "[uv] getCurrentLocation threw",
+      err instanceof Error ? err.message : err,
+    );
   }
   return null;
 }
