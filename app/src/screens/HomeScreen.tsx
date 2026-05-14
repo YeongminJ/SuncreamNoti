@@ -12,6 +12,7 @@ import {
 } from "../lib/promotion";
 import {
   AD_BONUS_MAX_PER_SLOT,
+  adBonusRewardFor,
   formatHm,
   nowMinuteOfDay,
 } from "../lib/recommendation";
@@ -164,16 +165,29 @@ export function HomeScreen() {
           />
         )}
 
-        <h3
+        <div
           style={{
-            fontSize: 15,
-            fontWeight: 700,
-            color: "#0F172A",
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
             margin: "24px 0 12px",
+            gap: 8,
           }}
         >
-          오늘의 권장 시간
-        </h3>
+          <h3
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#0F172A",
+              margin: 0,
+            }}
+          >
+            오늘의 권장 시간
+          </h3>
+          <span style={{ fontSize: 12, color: "#FF7E2E", fontWeight: 600 }}>
+            바를수록 단가 ↑
+          </span>
+        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {day.slots.map((slot, i) => (
@@ -300,9 +314,15 @@ function NextCard({
         }}
       >
         광고 보면 {nextSlot.baseReward}원
-        {AD_BONUS_MAX_PER_SLOT > 0
-          ? ` · 광고 더 보면 +${AD_BONUS_MAX_PER_SLOT}원까지`
-          : ""}
+        {AD_BONUS_MAX_PER_SLOT > 0 ? (
+          <>
+            {" → "}
+            {Array.from({ length: AD_BONUS_MAX_PER_SLOT }, (_, i) =>
+              adBonusRewardFor(slotIndex, i + 1),
+            ).join("원 → ")}
+            원까지 누진 ↑
+          </>
+        ) : null}
       </div>
       <div style={{ position: "absolute", top: 16, right: 16 }}>
         <EmojiBubble

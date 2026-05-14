@@ -5,7 +5,7 @@ import { useRewardedAd } from "../hooks/useRewardedAd";
 import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
 import {
   AD_BONUS_MAX_PER_SLOT,
-  AD_BONUS_PER_VIEW,
+  adBonusRewardFor,
 } from "../lib/recommendation";
 import { trackClick, trackScreen } from "../lib/track";
 import { useAppStore } from "../store/useAppStore";
@@ -50,6 +50,10 @@ export function ApplyResultScreen() {
 
   const adBonusLeft = Math.max(0, AD_BONUS_MAX_PER_SLOT - slot.adBonusCount);
   const totalThisSlot = applied ? slot.baseReward + slot.adBonusReward : 0;
+  // 다음에 볼 추가 광고의 누진 단가 (1회당 1원씩 ↑)
+  const nextBonusReward = adBonusRewardFor(slotIndex, slot.adBonusCount + 1);
+  // 다음 회차(슬롯)의 기본 단가 — "단가 올라간다" 메시지용
+  const nextSlotBaseReward = slotIndex + 2;
 
   const watchPrimaryAd = () => {
     trackClick("press_watch_primary_ad", { slot_index: slotIndex });
@@ -158,10 +162,11 @@ export function ApplyResultScreen() {
                 marginBottom: 4,
               }}
             >
-              광고 더 보고 +{AD_BONUS_PER_VIEW}원 받기
+              광고 더 보고 +{nextBonusReward}원 받기
             </div>
             <div style={{ fontSize: 13, color: "#64748B" }}>
               남은 횟수 {adBonusLeft}/{AD_BONUS_MAX_PER_SLOT}
+              {adBonusLeft > 0 ? " · 볼수록 단가 ↑" : ""}
               {ad.isTest ? " · 테스트 광고" : ""}
             </div>
             <div style={{ marginTop: 12 }}>
@@ -180,9 +185,29 @@ export function ApplyResultScreen() {
                     ? "이번 회차 광고 다 봤어요"
                     : ad.state === "loading"
                       ? "광고 준비 중…"
-                      : `광고 보고 +${AD_BONUS_PER_VIEW}원`}
+                      : `광고 보고 +${nextBonusReward}원`}
               </Button>
             </div>
+          </div>
+        )}
+
+        {applied && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: "10px 14px",
+              background: "#FFF3EC",
+              borderRadius: 12,
+              fontSize: 12,
+              color: "#7A3A12",
+              lineHeight: 1.5,
+              textAlign: "center",
+            }}
+          >
+            🧴 다음 회차 단가는{" "}
+            <strong>{nextSlotBaseReward}원</strong>부터 시작해요 — 회차가
+            올라갈수록, 같은 회차 안에서 광고를 더 볼수록 단가가 1원씩
+            올라가요.
           </div>
         )}
 

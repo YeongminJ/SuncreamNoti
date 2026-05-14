@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { readJSON, writeJSON } from "../lib/storage";
 import {
   AD_BONUS_MAX_PER_SLOT,
-  AD_BONUS_PER_VIEW,
+  adBonusRewardFor,
   baseRewardForIndex,
   todayKey,
 } from "../lib/recommendation";
@@ -155,10 +155,14 @@ export const useDayStore = create<DayState>((set, get) => ({
     const slot = day.slots[slotIndex];
     if (!slot || slot.adBonusCount >= AD_BONUS_MAX_PER_SLOT) return slot ?? null;
 
+    // 누진 단가: 같은 슬롯 안에서 추가 광고 볼 때마다 1원씩 ↑
+    const newBonusViewNumber = slot.adBonusCount + 1; // 1 or 2
+    const earnedThisView = adBonusRewardFor(slotIndex, newBonusViewNumber);
+
     const updatedSlot: SlotRecord = {
       ...slot,
-      adBonusCount: slot.adBonusCount + 1,
-      adBonusReward: slot.adBonusReward + AD_BONUS_PER_VIEW,
+      adBonusCount: newBonusViewNumber,
+      adBonusReward: slot.adBonusReward + earnedThisView,
     };
     const updatedSlots = day.slots.map((s, i) =>
       i === slotIndex ? updatedSlot : s,
@@ -169,7 +173,7 @@ export const useDayStore = create<DayState>((set, get) => ({
     const totals = get().totals;
     const updatedTotals: Totals = {
       ...totals,
-      lifetimeReward: totals.lifetimeReward + AD_BONUS_PER_VIEW,
+      lifetimeReward: totals.lifetimeReward + earnedThisView,
     };
     writeJSON(TOTALS_KEY, updatedTotals);
 

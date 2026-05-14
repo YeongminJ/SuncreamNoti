@@ -117,20 +117,35 @@ export function recommendedSlotsFromStart(
 }
 
 /**
- * 회차별 기본 적립.
- * - 1·2번째: 1원 (가벼운 시작)
- * - 3번째 이후: 3원 (꾸준히 발랐을 때 보상)
+ * 회차별 첫 광고 기본 적립. 슬롯이 늘어날수록 단가도 1원씩 ↑
+ * - 1번째 슬롯: 1원 → 2번째: 2원 → 3번째: 3원 ...
  *
- * 운영비 제어를 위해 4·5·6번째 슬롯도 3원 고정. 광고 단가가 안정되면 상향 검토.
+ * 사용자에게 "꾸준히 바를수록 단가가 올라가요"라는 동기를 줘요.
  */
 export function baseRewardForIndex(index: number): number {
-  if (index <= 1) return 1;
-  return 3;
+  return index + 1;
 }
 
-/** 광고 보너스 단가 + 회차당 최대 횟수. */
-export const AD_BONUS_PER_VIEW = 1;
+/** 회차당 추가 광고 시청 가능 횟수 (기본 광고 제외). */
 export const AD_BONUS_MAX_PER_SLOT = 2;
+
+/**
+ * 같은 슬롯에서 연속 광고 시청 시 단가 누진.
+ * - 같은 슬롯 안에서 한 번 더 볼 때마다 1원씩 ↑
+ *
+ * 예) 슬롯 0(1번째): 기본 1원 → 추가 #1: 2원 → 추가 #2: 3원
+ *     슬롯 1(2번째): 기본 2원 → 추가 #1: 3원 → 추가 #2: 4원
+ *     슬롯 2(3번째): 기본 3원 → 추가 #1: 4원 → 추가 #2: 5원
+ *
+ * @param slotIndex 현재 슬롯 인덱스 (0부터)
+ * @param bonusViewNumber 이번에 본 추가 광고 회차 (1=첫 추가, 2=두번째 추가)
+ */
+export function adBonusRewardFor(
+  slotIndex: number,
+  bonusViewNumber: number,
+): number {
+  return slotIndex + 1 + bonusViewNumber;
+}
 
 export function formatHm(totalMinutes: number): string {
   const h = Math.floor(totalMinutes / 60) % 24;
