@@ -1,81 +1,64 @@
-import { Accuracy, getCurrentLocation } from "@apps-in-toss/web-framework";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
- * 자외선 지수(UV index) 조회 hook.
+ * 자외선 지수(UV index) 조회 hook — 주요 도시 선택 방식.
  *
  * 동작:
- * - 기본 좌표는 **서울**. 위치 권한 요청 없이 즉시 표시.
- * - 사용자가 "내 위치로 보기"를 클릭하면 그때 토스 SDK `getCurrentLocation` 호출 → 권한 모달 노출.
- * - 한 번이라도 권한을 받았으면 다음 진입부터는 자동으로 fresh 좌표 재요청 (캐싱 X).
- * - UV 값은 좌표(소수 1자리) 단위로 1시간 localStorage 캐시.
+ * - 토스 SDK 위치 권한을 쓰지 않아요. (샌드박스/실기기에서 권한 모달이 안 정상 동작해서 빼버림)
+ * - 사용자가 주요 도시 중 하나를 선택 → 그 좌표로 UV/일출/일몰 fetch.
+ * - 선택한 도시는 localStorage 영구 저장 (다음 진입 시 그 도시로 시작).
+ * - UV 값은 도시 단위로 1시간 localStorage 캐시.
  * - Open-Meteo 공개 API에서 직접 fetch (서버 경유 X, key 없음, CORS OK).
  *
  * 부가 정보 용도라 실패해도 silently skip — 별도 에러 토스트 없음.
  */
 
-const DEFAULT_LAT = 37.5665;
-const DEFAULT_LON = 126.978;
-const SEOUL_LABEL = "서울 기준";
-const USER_LABEL = "내 위치";
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1시간 — UV 값 캐시
-const CACHE_KEY_PREFIX = "sunalarm.uv.v1";
-/** "이 사용자는 위치 권한을 한 번 동의했음" 영속 플래그. */
-const LOCATION_GRANTED_KEY = "sunalarm.uv.locationGranted.v1";
-/** 좌표 캐시 — 토스 SDK getCurrentLocation 재호출 줄여서 권한 모달 반복 방지. */
-const COORDS_CACHE_KEY = "sunalarm.uv.coords.v1";
-const COORDS_CACHE_TTL_MS = 30 * 60 * 1000; // 30분
-
-function readGrantedFlag(): boolean {
-  try {
-    return window.localStorage.getItem(LOCATION_GRANTED_KEY) === "1";
-  } catch {
-    return false;
-  }
+export interface CityOption {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
 }
 
-function writeGrantedFlag(granted: boolean): void {
+/**
+ * 주요 도시 좌표 (KMA·공식 시청 위치 기준 근사).
+ * 광역시 + 인구 많은 특례시 위주.
+ */
+export const CITIES: CityOption[] = [
+  { id: "seoul", name: "서울", lat: 37.5665, lon: 126.978 },
+  { id: "busan", name: "부산", lat: 35.1796, lon: 129.0756 },
+  { id: "incheon", name: "인천", lat: 37.4563, lon: 126.7052 },
+  { id: "daegu", name: "대구", lat: 35.8714, lon: 128.6014 },
+  { id: "daejeon", name: "대전", lat: 36.3504, lon: 127.3845 },
+  { id: "gwangju", name: "광주", lat: 35.1595, lon: 126.8526 },
+  { id: "ulsan", name: "울산", lat: 35.5384, lon: 129.3114 },
+  { id: "sejong", name: "세종", lat: 36.4801, lon: 127.289 },
+  { id: "suwon", name: "수원", lat: 37.2636, lon: 127.0286 },
+  { id: "changwon", name: "창원", lat: 35.228, lon: 128.6811 },
+  { id: "jeonju", name: "전주", lat: 35.8242, lon: 127.148 },
+  { id: "chuncheon", name: "춘천", lat: 37.8813, lon: 127.7298 },
+  { id: "gangneung", name: "강릉", lat: 37.7519, lon: 128.8761 },
+  { id: "jeju", name: "제주", lat: 33.4996, lon: 126.5312 },
+];
+
+const DEFAULT_CITY_ID = "seoul";
+const CITY_KEY = "sunalarm.uv.city.v1";
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1시간 — UV 값 캐시
+const CACHE_KEY_PREFIX = "sunalarm.uv.v1";
+
+function readSavedCityId(): string {
   try {
-    if (granted) {
-      window.localStorage.setItem(LOCATION_GRANTED_KEY, "1");
-    } else {
-      window.localStorage.removeItem(LOCATION_GRANTED_KEY);
-    }
+    const saved = window.localStorage.getItem(CITY_KEY);
+    if (saved && CITIES.some((c) => c.id === saved)) return saved;
   } catch {
     // ignore
   }
+  return DEFAULT_CITY_ID;
 }
 
-interface CoordsCacheEntry {
-  lat: number;
-  lon: number;
-  ts: number;
-}
-
-function readCoordsCache(): CoordsCacheEntry | null {
+function writeSavedCityId(id: string): void {
   try {
-    const raw = window.localStorage.getItem(COORDS_CACHE_KEY);
-    if (!raw) return null;
-    const c = JSON.parse(raw) as CoordsCacheEntry;
-    if (
-      typeof c.lat !== "number" ||
-      typeof c.lon !== "number" ||
-      typeof c.ts !== "number"
-    )
-      return null;
-    if (Date.now() - c.ts > COORDS_CACHE_TTL_MS) return null;
-    return c;
-  } catch {
-    return null;
-  }
-}
-
-function writeCoordsCache(lat: number, lon: number): void {
-  try {
-    window.localStorage.setItem(
-      COORDS_CACHE_KEY,
-      JSON.stringify({ lat, lon, ts: Date.now() }),
-    );
+    window.localStorage.setItem(CITY_KEY, id);
   } catch {
     // ignore
   }
@@ -93,29 +76,24 @@ export function levelFromUv(uv: number): UvLevel {
 
 interface CacheEntry {
   uv: number;
-  /** 오늘 UV 정점 값 (Open-Meteo `daily.uv_index_max`) */
   uvMax: number | null;
-  /** 오늘 UV 정점 시각 — "HH:MM" 포맷 */
   uvMaxTime: string | null;
-  /** 일출 "HH:MM" */
   sunrise: string | null;
-  /** 일몰 "HH:MM" */
   sunset: string | null;
   ts: number;
 }
 
-function cacheKey(lat: number, lon: number): string {
-  return `${CACHE_KEY_PREFIX}.${lat.toFixed(1)}.${lon.toFixed(1)}`;
+function cacheKey(cityId: string): string {
+  return `${CACHE_KEY_PREFIX}.${cityId}`;
 }
 
-function readCache(lat: number, lon: number): CacheEntry | null {
+function readCache(cityId: string): CacheEntry | null {
   try {
-    const raw = window.localStorage.getItem(cacheKey(lat, lon));
+    const raw = window.localStorage.getItem(cacheKey(cityId));
     if (!raw) return null;
     const c = JSON.parse(raw) as Partial<CacheEntry>;
     if (typeof c.uv !== "number" || typeof c.ts !== "number") return null;
     if (Date.now() - c.ts > CACHE_TTL_MS) return null;
-    // 누락 필드는 null 채워서 호환
     return {
       uv: c.uv,
       uvMax: typeof c.uvMax === "number" ? c.uvMax : null,
@@ -130,13 +108,12 @@ function readCache(lat: number, lon: number): CacheEntry | null {
 }
 
 function writeCache(
-  lat: number,
-  lon: number,
+  cityId: string,
   entry: Omit<CacheEntry, "ts">,
 ): void {
   try {
     window.localStorage.setItem(
-      cacheKey(lat, lon),
+      cacheKey(cityId),
       JSON.stringify({ ...entry, ts: Date.now() }),
     );
   } catch {
@@ -144,7 +121,6 @@ function writeCache(
   }
 }
 
-/** "2026-05-14T13:00" → "13:00" */
 function timeOfDay(iso: string | undefined | null): string | null {
   if (typeof iso !== "string") return null;
   const m = iso.match(/T(\d{2}:\d{2})/);
@@ -169,8 +145,6 @@ async function fetchUvFromOpenMeteo(
   lat: number,
   lon: number,
 ): Promise<Omit<CacheEntry, "ts"> | null> {
-  // 한 번의 호출로 현재 UV + 오늘 정점 + 일출/일몰까지 받아옴.
-  // forecast_days=1로 오늘 데이터만 받아서 페이로드 작게 유지.
   const url =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${lat}` +
@@ -187,7 +161,6 @@ async function fetchUvFromOpenMeteo(
     const uv = json.current?.uv_index;
     if (typeof uv !== "number") return null;
 
-    // 오늘 hourly UV에서 최대값 인덱스 찾아 시각 추출
     let uvMaxTime: string | null = null;
     const hours = json.hourly?.uv_index;
     const times = json.hourly?.time;
@@ -214,75 +187,27 @@ async function fetchUvFromOpenMeteo(
 export interface UvState {
   uv: number | null;
   level: UvLevel | null;
-  /** 오늘 UV 정점 값 */
   uvMax: number | null;
-  /** 오늘 UV 정점 시각 — "HH:MM" */
   uvMaxTime: string | null;
-  /** 오늘 일출 시각 — "HH:MM" */
   sunrise: string | null;
-  /** 오늘 일몰 시각 — "HH:MM" */
   sunset: string | null;
-  locationLabel: string;
+  /** 현재 선택된 도시 */
+  city: CityOption;
+  /** 사용 가능한 도시 목록 */
+  cities: CityOption[];
+  /** 도시 변경 — id 전달. localStorage에 자동 저장. */
+  setCity: (id: string) => void;
   loading: boolean;
-  isUserLocation: boolean;
-  /** 클릭 시 권한 요청 + 좌표 갱신. 거부되거나 실패하면 서울 유지. */
-  requestUserLocation: () => Promise<void>;
 }
 
-/**
- * 토스 SDK로 좌표 받기.
- *
- * SDK가 `createPermissionFunction`으로 감싸여 있어서, `getCurrentLocation(...)`
- * 호출 한 번에 권한 요청 모달 노출 + 사용자 응답 대기 + 좌표 fetch까지 모두 처리됨.
- *
- * 거부되면 SDK 내부에서 throw, 허용되면 좌표 반환. 따로 getPermission /
- * openPermissionDialog 호출하면 모달이 두 번 뜨거나 응답 매칭 안 맞아서
- * 좌표를 못 받는 케이스 발생 — 그래서 SDK가 시키는 대로 호출 한 번만.
- *
- * 실패/거부면 null. 호출자에서 fallback 처리.
- */
-async function fetchCurrentCoords(): Promise<{
-  lat: number;
-  lon: number;
-} | null> {
-  if (typeof getCurrentLocation !== "function") {
-    console.warn("[uv] getCurrentLocation not available");
-    return null;
-  }
-  try {
-    console.debug("[uv] requesting location...");
-    const result = await getCurrentLocation({ accuracy: Accuracy.Balanced });
-    console.debug("[uv] location result", JSON.stringify(result));
-    const lat = result?.coords?.latitude;
-    const lon = result?.coords?.longitude;
-    if (typeof lat === "number" && typeof lon === "number") {
-      return { lat, lon };
-    }
-    console.warn("[uv] coords missing in result", result);
-  } catch (err) {
-    console.warn(
-      "[uv] getCurrentLocation threw",
-      err instanceof Error ? err.message : err,
-    );
-  }
-  return null;
+function findCity(id: string): CityOption {
+  return CITIES.find((c) => c.id === id) ?? CITIES[0];
 }
 
 export function useUvIndex(): UvState {
-  // 이전 동의 이력 + 캐시된 좌표가 있으면 그걸로 즉시 시작 (권한 모달 안 뜸).
-  // 캐시 없으면 서울 좌표로 시작하고, 마운트 후 fresh 좌표 fetch.
-  const [coords, setCoords] = useState<{
-    lat: number;
-    lon: number;
-    isUser: boolean;
-  }>(() => {
-    const cached = readCoordsCache();
-    const granted = readGrantedFlag();
-    if (granted && cached) {
-      return { lat: cached.lat, lon: cached.lon, isUser: true };
-    }
-    return { lat: DEFAULT_LAT, lon: DEFAULT_LON, isUser: granted };
-  });
+  const [cityId, setCityIdState] = useState<string>(() => readSavedCityId());
+  const city = findCity(cityId);
+
   const [uv, setUv] = useState<number | null>(null);
   const [uvMax, setUvMax] = useState<number | null>(null);
   const [uvMaxTime, setUvMaxTime] = useState<string | null>(null);
@@ -290,25 +215,9 @@ export function useUvIndex(): UvState {
   const [sunset, setSunset] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 진입 시 동의 이력 있는데 좌표 캐시 만료된 경우만 SDK 호출.
-  // 캐시 살아있으면 fetch 안 함 → 권한 모달 반복 노출 방지.
+  // 도시 변경 시 UV 재조회 (캐시 우선)
   useEffect(() => {
-    if (!readGrantedFlag()) return;
-    if (readCoordsCache()) return;
-    let alive = true;
-    void fetchCurrentCoords().then((c) => {
-      if (!alive || !c) return;
-      writeCoordsCache(c.lat, c.lon);
-      setCoords({ lat: c.lat, lon: c.lon, isUser: true });
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  // coords 변경 시 UV + 오늘 정점·일출·일몰 재조회 (캐시 우선)
-  useEffect(() => {
-    const cached = readCache(coords.lat, coords.lon);
+    const cached = readCache(cityId);
     if (cached) {
       setUv(cached.uv);
       setUvMax(cached.uvMax);
@@ -319,7 +228,7 @@ export function useUvIndex(): UvState {
     }
     let alive = true;
     setLoading(true);
-    void fetchUvFromOpenMeteo(coords.lat, coords.lon).then((entry) => {
+    void fetchUvFromOpenMeteo(city.lat, city.lon).then((entry) => {
       if (!alive) return;
       if (entry != null) {
         setUv(entry.uv);
@@ -327,31 +236,20 @@ export function useUvIndex(): UvState {
         setUvMaxTime(entry.uvMaxTime);
         setSunrise(entry.sunrise);
         setSunset(entry.sunset);
-        writeCache(coords.lat, coords.lon, entry);
+        writeCache(cityId, entry);
       }
       setLoading(false);
     });
     return () => {
       alive = false;
     };
-  }, [coords.lat, coords.lon]);
+  }, [cityId, city.lat, city.lon]);
 
-  const requestUserLocation = useCallback(async () => {
-    if (typeof getCurrentLocation !== "function") return;
-    // 옵티미스틱: 클릭한 순간 라벨/버튼 즉시 갱신
-    setCoords((prev) => ({ ...prev, isUser: true }));
-    const c = await fetchCurrentCoords();
-    if (c) {
-      writeCoordsCache(c.lat, c.lon);
-      setCoords({ lat: c.lat, lon: c.lon, isUser: true });
-      writeGrantedFlag(true);
-      return;
-    }
-    // 좌표 fetch 실패: 권한 거부 또는 SDK 오류.
-    // 옵티미스틱 라벨을 롤백해 "내 위치"인데 서울 데이터인 불일치 상태를 막음.
-    setCoords((prev) => ({ ...prev, isUser: false }));
-    writeGrantedFlag(false);
-  }, []);
+  const setCity = (id: string) => {
+    if (!CITIES.some((c) => c.id === id)) return;
+    setCityIdState(id);
+    writeSavedCityId(id);
+  };
 
   return {
     uv,
@@ -360,9 +258,9 @@ export function useUvIndex(): UvState {
     uvMaxTime,
     sunrise,
     sunset,
-    locationLabel: coords.isUser ? USER_LABEL : SEOUL_LABEL,
+    city,
+    cities: CITIES,
+    setCity,
     loading,
-    isUserLocation: coords.isUser,
-    requestUserLocation,
   };
 }
