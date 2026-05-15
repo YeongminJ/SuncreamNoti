@@ -3,7 +3,7 @@ import { readJSON, writeJSON } from "../lib/storage";
 import {
   AD_BONUS_MAX_PER_SLOT,
   adBonusRewardFor,
-  baseRewardForIndex,
+  nowMinuteOfDay,
   todayKey,
 } from "../lib/recommendation";
 
@@ -41,12 +41,14 @@ function dayStorageKey(date: string): string {
 }
 
 function freshDay(date: string, slotMinutes: number[]): DayRecord {
+  // baseReward는 applySlot 시점에 "완료 순서" 기반으로 결정해요.
+  // 여기서는 0으로 두고, 실제 적립 시 덮어써요.
   return {
     date,
-    slots: slotMinutes.map((m, i) => ({
+    slots: slotMinutes.map((m) => ({
       targetMinute: m,
       appliedAt: null,
-      baseReward: baseRewardForIndex(i),
+      baseReward: 0,
       adBonusCount: 0,
       adBonusReward: 0,
     })),
@@ -106,13 +108,17 @@ export const useDayStore = create<DayState>((set, get) => ({
     }
 
     const next = freshDay(date, slotMinutes);
-    // 기존 적립 기록은 슬롯 정렬 시 보존 시도 (target 분 기준 매칭)
+    // 기존 적립 기록은 슬롯 정렬 시 보존 시도 (target 분 기준 매칭).
+    // applied된 슬롯의 baseReward는 그대로 보존하고, 미적용 슬롯만 0으로 둬요.
+    // (freshDay가 더 이상 인덱스 기반 baseReward를 채우지 않기 때문)
     if (existing) {
       next.slots = next.slots.map((slot) => {
         const prev = existing.slots.find(
           (s) => s.targetMinute === slot.targetMinute,
         );
-        return prev ? { ...slot, ...prev, baseReward: slot.baseReward } : slot;
+        return prev
+          ? { ...slot, ...prev, baseReward: prev.appliedAt != null ? prev.baseReward : 0 }
+          : slot;
       });
     }
     writeJSON(key, next);
@@ -125,8 +131,18 @@ export const useDayStore = create<DayState>((set, get) => ({
     if (!day) return null;
     const slot = day.slots[slotIndex];
     if (!slot || slot.appliedAt != null) return slot ?? null;
+    // 만료된 슬롯은 적립 불가 — 더 늦은 시각의 슬롯이 이미 도래한 경우.
+    if (isSlotExpired(day, slotIndex, nowMinuteOfDay())) return slot;
 
-    const updatedSlot: SlotRecord = { ...slot, appliedAt: Date.now() };
+    // 완료 순서로 baseReward 결정 (인덱스 무관).
+    const completedBefore = day.slots.filter((s) => s.appliedAt != null).length;
+    const baseReward = completedBefore + 1;
+
+    const updatedSlot: SlotRecord = {
+      ...slot,
+      appliedAt: Date.now(),
+      baseReward,
+    };
     const updatedSlots = day.slots.map((s, i) =>
       i === slotIndex ? updatedSlot : s,
     );
@@ -155,9 +171,10 @@ export const useDayStore = create<DayState>((set, get) => ({
     const slot = day.slots[slotIndex];
     if (!slot || slot.adBonusCount >= AD_BONUS_MAX_PER_SLOT) return slot ?? null;
 
-    // 누진 단가: 같은 슬롯 안에서 추가 광고 볼 때마다 1원씩 ↑
+    // 누진 단가: 같은 슬롯 안에서 추가 광고 볼 때마다 1원씩 ↑.
+    // slot.baseReward(applySlot 시점에 완료 순서로 확정된 값)를 기준으로 누진해요.
     const newBonusViewNumber = slot.adBonusCount + 1; // 1 or 2
-    const earnedThisView = adBonusRewardFor(slotIndex, newBonusViewNumber);
+    const earnedThisView = adBonusRewardFor(slot.baseReward, newBonusViewNumber);
 
     const updatedSlot: SlotRecord = {
       ...slot,
@@ -213,11 +230,21 @@ export function redeemableAmount(totals: Totals): number {
   return Math.max(0, earned - redeemed);
 }
 
-/** 가장 빨리 발려야 하는 미완료 슬롯 인덱스. 모두 끝났으면 -1. */
-export function nextOpenSlotIndex(day: DayRecord | null): number {
+/**
+ * 가장 빨리 발려야 하는 미완료 슬롯 인덱스. 모두 끝났거나 남은 게 전부 만료면 -1.
+ * 만료된 슬롯은 더 이상 적립 불가라서 "다음 회차" 후보에서 제외해요.
+ *
+ * @param nowMinute 만료 판단용 현재 분. 생략 시 만료 검사를 하지 않아요(예전 동작).
+ */
+export function nextOpenSlotIndex(
+  day: DayRecord | null,
+  nowMinute?: number,
+): number {
   if (!day) return -1;
   for (let i = 0; i < day.slots.length; i++) {
-    if (day.slots[i].appliedAt == null) return i;
+    if (day.slots[i].appliedAt != null) continue;
+    if (nowMinute != null && isSlotExpired(day, i, nowMinute)) continue;
+    return i;
   }
   return -1;
 }
@@ -236,4 +263,47 @@ export function totalEarnedToday(day: DayRecord | null): number {
 export function completedSlotCount(day: DayRecord | null): number {
   if (!day) return 0;
   return day.slots.filter((s) => s.appliedAt != null).length;
+}
+
+/**
+ * 만료(놓침) 판단.
+ * 미완료(`appliedAt == null`) 상태에서, 본인보다 더 늦은 시각의 슬롯이 이미 도래했으면 만료로 봐요.
+ *
+ * 예) 08:00 / 11:00 / 14:00 설정 + 현재 11:30 → 08:00은 만료.
+ */
+export function isSlotExpired(
+  day: DayRecord | null,
+  slotIndex: number,
+  nowMinute: number,
+): boolean {
+  if (!day) return false;
+  const slot = day.slots[slotIndex];
+  if (!slot || slot.appliedAt != null) return false;
+  return day.slots.some(
+    (s, i) =>
+      i !== slotIndex &&
+      s.targetMinute > slot.targetMinute &&
+      s.targetMinute <= nowMinute,
+  );
+}
+
+/**
+ * 슬롯의 현재 상태.
+ * - `applied`: 이미 발랐음
+ * - `active`: 시각이 도래했고 아직 만료 안 됐음 (지금 발릴 수 있음)
+ * - `expired`: 더 늦은 슬롯이 이미 지나서 놓침
+ * - `upcoming`: 아직 시각이 도래하지 않음
+ */
+export function slotStatus(
+  day: DayRecord | null,
+  slotIndex: number,
+  nowMinute: number,
+): "applied" | "active" | "expired" | "upcoming" {
+  if (!day) return "upcoming";
+  const slot = day.slots[slotIndex];
+  if (!slot) return "upcoming";
+  if (slot.appliedAt != null) return "applied";
+  if (slot.targetMinute > nowMinute) return "upcoming";
+  if (isSlotExpired(day, slotIndex, nowMinute)) return "expired";
+  return "active";
 }

@@ -117,13 +117,16 @@ export function recommendedSlotsFromStart(
 }
 
 /**
- * 회차별 첫 광고 기본 적립. 슬롯이 늘어날수록 단가도 1원씩 ↑
- * - 1번째 슬롯: 1원 → 2번째: 2원 → 3번째: 3원 ...
+ * 그날의 완료 순서로 결정되는 기본 적립.
+ * - 첫 완료: 1원 → 두 번째 완료: 2원 → 세 번째: 3원 ...
  *
- * 사용자에게 "꾸준히 바를수록 단가가 올라가요"라는 동기를 줘요.
+ * "슬롯 배열의 위치"가 아니라 "실제 완료 순서"를 기준으로 해요.
+ * 예) 08:00을 안 바르고 11:00에 처음 발랐다면, 11:00이 첫 번째 완료 → 1원.
+ *
+ * @param completionOrder 0-indexed 완료 순번 (이번 슬롯을 포함하기 전 이미 완료된 슬롯 수)
  */
-export function baseRewardForIndex(index: number): number {
-  return index + 1;
+export function baseRewardForCompletionOrder(completionOrder: number): number {
+  return completionOrder + 1;
 }
 
 /** 회차당 추가 광고 시청 가능 횟수 (기본 광고 제외). */
@@ -133,18 +136,21 @@ export const AD_BONUS_MAX_PER_SLOT = 2;
  * 같은 슬롯에서 연속 광고 시청 시 단가 누진.
  * - 같은 슬롯 안에서 한 번 더 볼 때마다 1원씩 ↑
  *
- * 예) 슬롯 0(1번째): 기본 1원 → 추가 #1: 2원 → 추가 #2: 3원
- *     슬롯 1(2번째): 기본 2원 → 추가 #1: 3원 → 추가 #2: 4원
- *     슬롯 2(3번째): 기본 3원 → 추가 #1: 4원 → 추가 #2: 5원
+ * 예) baseReward 1원: 추가 #1: 2원 → 추가 #2: 3원
+ *     baseReward 2원: 추가 #1: 3원 → 추가 #2: 4원
+ *     baseReward 3원: 추가 #1: 4원 → 추가 #2: 5원
  *
- * @param slotIndex 현재 슬롯 인덱스 (0부터)
+ * 인덱스가 아니라 슬롯에 저장된 baseReward를 기준으로 누진해요.
+ * 만료/완료 순서 도입으로 같은 인덱스라도 baseReward가 달라질 수 있기 때문이에요.
+ *
+ * @param baseReward 해당 슬롯의 baseReward (applySlot 시점에 확정된 값)
  * @param bonusViewNumber 이번에 본 추가 광고 회차 (1=첫 추가, 2=두번째 추가)
  */
 export function adBonusRewardFor(
-  slotIndex: number,
+  baseReward: number,
   bonusViewNumber: number,
 ): number {
-  return slotIndex + 1 + bonusViewNumber;
+  return baseReward + bonusViewNumber;
 }
 
 export function formatHm(totalMinutes: number): string {

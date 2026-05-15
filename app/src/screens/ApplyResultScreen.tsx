@@ -51,10 +51,15 @@ export function ApplyResultScreen() {
 
   const adBonusLeft = Math.max(0, AD_BONUS_MAX_PER_SLOT - slot.adBonusCount);
   const totalThisSlot = applied ? slot.baseReward + slot.adBonusReward : 0;
-  // 다음에 볼 추가 광고의 누진 단가 (1회당 1원씩 ↑)
-  const nextBonusReward = adBonusRewardFor(slotIndex, slot.adBonusCount + 1);
-  // 다음 회차(슬롯)의 기본 단가 — "단가 올라간다" 메시지용
-  const nextSlotBaseReward = slotIndex + 2;
+  // 다음에 볼 추가 광고의 누진 단가 (1회당 1원씩 ↑).
+  // applySlot 시점에 확정된 slot.baseReward를 기준으로 누진해요.
+  const nextBonusReward = adBonusRewardFor(
+    slot.baseReward,
+    slot.adBonusCount + 1,
+  );
+  // 다음 회차(슬롯)의 기본 단가 — "단가 올라간다" 메시지용.
+  // 완료 순서 기반이라 slotIndex가 아닌 이번 baseReward + 1로 표시.
+  const nextSlotBaseReward = slot.baseReward + 1;
 
   const watchPrimaryAd = () => {
     trackClick("press_watch_primary_ad", { slot_index: slotIndex });

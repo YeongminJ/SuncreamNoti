@@ -1,6 +1,7 @@
 import { Button, Top } from "@toss/tds-mobile";
 import { useEffect, useMemo, useState } from "react";
 import { AdLoadingOverlay } from "../components/AdLoadingOverlay";
+import { AuthFailedBanner } from "../components/AuthFailedBanner";
 import { BannerAdSlot } from "../components/BannerAdSlot";
 import { EmojiBubble } from "../components/EmojiBubble";
 import { UvIndicator } from "../components/UvIndicator";
@@ -23,6 +24,7 @@ import {
   completedSlotCount,
   nextOpenSlotIndex,
   redeemableAmount,
+  slotStatus,
   totalEarnedToday,
   useDayStore,
   type SlotRecord,
@@ -69,8 +71,11 @@ export function HomeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const nextIdx = useMemo(() => nextOpenSlotIndex(day), [day]);
+  const nextIdx = useMemo(() => nextOpenSlotIndex(day, now), [day, now]);
   const nextSlot = nextIdx >= 0 ? day?.slots[nextIdx] : undefined;
+  // "다음 회차에 받을" 미리보기 금액 = 현재까지 완료된 슬롯 수 + 1.
+  // applySlot 시점에 baseReward가 동적으로 정해지므로 미리 계산해서 카드에 표시.
+  const nextBaseReward = completedSlotCount(day) + 1;
 
   const isUnlocked = nextSlot != null && now >= nextSlot.targetMinute;
   const minutesUntilNext =
@@ -148,6 +153,8 @@ export function HomeScreen() {
         }
       />
 
+      <AuthFailedBanner />
+
       <div style={{ padding: "8px 24px 24px" }}>
         <NextCard
           allDone={allDone}
@@ -155,6 +162,7 @@ export function HomeScreen() {
           minutesUntilNext={minutesUntilNext}
           nextSlot={nextSlot}
           slotIndex={nextIdx}
+          baseReward={nextBaseReward}
         />
 
         {PROMOTION_ENABLED && redeemable > 0 && (
@@ -197,7 +205,7 @@ export function HomeScreen() {
               key={i}
               index={i}
               slot={slot}
-              now={now}
+              status={slotStatus(day, i, now)}
               isCurrent={i === nextIdx}
             />
           ))}
@@ -243,12 +251,15 @@ function NextCard({
   minutesUntilNext,
   nextSlot,
   slotIndex,
+  baseReward,
 }: {
   allDone: boolean;
   isUnlocked: boolean;
   minutesUntilNext: number;
   nextSlot?: SlotRecord;
   slotIndex: number;
+  /** 이번 슬롯을 발랐을 때 받게 될 base 금액 (완료 순서 + 1). */
+  baseReward: number;
 }) {
   if (allDone) {
     return (
@@ -315,12 +326,12 @@ function NextCard({
           marginTop: 8,
         }}
       >
-        광고 보면 {nextSlot.baseReward}원
+        광고 보면 {baseReward}원
         {AD_BONUS_MAX_PER_SLOT > 0 ? (
           <>
             {" → "}
             {Array.from({ length: AD_BONUS_MAX_PER_SLOT }, (_, i) =>
-              adBonusRewardFor(slotIndex, i + 1),
+              adBonusRewardFor(baseReward, i + 1),
             ).join("원 → ")}
             원까지 누진 ↑
           </>
@@ -438,16 +449,16 @@ function RedeemCard({
 function SlotRow({
   index,
   slot,
-  now,
+  status,
   isCurrent,
 }: {
   index: number;
   slot: SlotRecord;
-  now: number;
+  status: "applied" | "active" | "expired" | "upcoming";
   isCurrent: boolean;
 }) {
-  const done = slot.appliedAt != null;
-  const missed = !done && now > slot.targetMinute + 60 && !isCurrent;
+  const done = status === "applied";
+  const expired = status === "expired";
   const earned = done ? slot.baseReward + slot.adBonusReward : 0;
 
   let statusText: string;
@@ -455,18 +466,18 @@ function SlotRow({
   if (done) {
     statusText = `+${earned}원`;
     statusColor = "#10B981";
-  } else if (isCurrent) {
-    statusText = now >= slot.targetMinute ? "지금" : "대기 중";
-    statusColor = "#FF9B3C";
-  } else if (missed) {
+  } else if (expired) {
     statusText = "놓침";
     statusColor = "#94A3B8";
+  } else if (isCurrent) {
+    statusText = status === "active" ? "지금" : "대기 중";
+    statusColor = "#FF9B3C";
   } else {
     statusText = "잠김";
     statusColor = "#94A3B8";
   }
 
-  const slotEmoji = done ? "✅" : isCurrent ? "☀️" : missed ? "💤" : "🧴";
+  const slotEmoji = done ? "✅" : isCurrent ? "☀️" : expired ? "💤" : "🧴";
   const slotEmojiBg = done
     ? "#DCFCE7"
     : isCurrent
@@ -480,10 +491,17 @@ function SlotRow({
         alignItems: "center",
         justifyContent: "space-between",
         padding: "14px 16px",
-        background: done ? "#F0FDF4" : isCurrent ? "#FFF3EC" : "#F8FAFC",
+        background: done
+          ? "#F0FDF4"
+          : isCurrent
+            ? "#FFF3EC"
+            : expired
+              ? "#F1F5F9"
+              : "#F8FAFC",
         borderRadius: 14,
         border: `1px solid ${done ? "#BBF7D0" : isCurrent ? "#FFD9C2" : "transparent"}`,
         gap: 12,
+        opacity: expired ? 0.65 : 1,
       }}
     >
       <EmojiBubble size={40} background={slotEmojiBg}>
@@ -513,9 +531,11 @@ function SlotRow({
         >
           {statusText}
         </div>
-        <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
-          기본 {slot.baseReward}원
-        </div>
+        {done && (
+          <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+            기본 {slot.baseReward}원
+          </div>
+        )}
       </div>
     </div>
   );

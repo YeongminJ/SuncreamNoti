@@ -137,7 +137,12 @@ export async function loginWithToss(input: {
   userKey: string;
   authorizationCode: string;
   referrer: "DEFAULT" | "SANDBOX";
-}): Promise<{ ok: boolean; tossUserKey?: number; error?: string }> {
+}): Promise<{
+  ok: boolean;
+  tossUserKey?: number;
+  error?: string;
+  errorCode?: string;
+}> {
   try {
     const res = await fetch(`${API_URL}/api/auth/login`, {
       method: "POST",
@@ -155,7 +160,7 @@ export async function loginWithToss(input: {
         ? `${data.step ?? "?"}: ${data.error}`
         : `HTTP ${res.status}`;
       console.warn("[api] loginWithToss failed", errorMsg);
-      return { ok: false, error: errorMsg };
+      return { ok: false, error: errorMsg, errorCode: data?.error };
     }
     if (import.meta.env.DEV) {
       console.debug("[api] loginWithToss ok", data.tossUserKey);

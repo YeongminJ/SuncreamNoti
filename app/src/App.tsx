@@ -4,7 +4,12 @@ import { DevResetButton } from "./components/DevResetButton";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { WhoAmIBadge } from "./components/WhoAmIBadge";
 import { LoadingSplash } from "./components/LoadingSplash";
-import { fetchAuthStatus, getUserKey, loginWithToss } from "./lib/api";
+import {
+  fetchAuthStatus,
+  getUserKey,
+  loginWithToss,
+  registerUser,
+} from "./lib/api";
 import { ApplyResultScreen } from "./screens/ApplyResultScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { OnboardingScreen } from "./screens/OnboardingScreen";
@@ -115,11 +120,39 @@ function App() {
       if (!userKey) return;
       const { authorizationCode, referrer } = useAuthStore.getState();
       if (!authorizationCode || !referrer) return;
-      const res = await loginWithToss({
+
+      let res = await loginWithToss({
         userKey,
         authorizationCode,
         referrer,
       });
+
+      // 서버에 users 행이 없는 경우 — 로컬 프로필로 재등록 후 재시도.
+      // 재설치/디바이스 교체 등으로 anonymousKey가 갱신된 재방문자 자동 복구.
+      if (!res.ok && res.errorCode === "user_not_registered") {
+        const sorted = [...profile.slotMinutes].sort((a, b) => a - b);
+        if (sorted.length > 0) {
+          const reg = await registerUser({
+            userKey,
+            skinType: profile.skinType,
+            environment: profile.environment,
+            startMinute: sorted[0],
+            endMinute: sorted[sorted.length - 1],
+            slotMinutes: sorted,
+          });
+          if (reg.ok) {
+            if (import.meta.env.DEV) {
+              console.debug("[app] re-registered user, retry loginWithToss");
+            }
+            res = await loginWithToss({
+              userKey,
+              authorizationCode,
+              referrer,
+            });
+          }
+        }
+      }
+
       if (res.ok && typeof res.tossUserKey === "number") {
         useAuthStore.getState().setTossUserKey(res.tossUserKey);
       }
