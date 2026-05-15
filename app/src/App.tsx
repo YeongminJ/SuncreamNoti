@@ -2,6 +2,7 @@ import { appLogin } from "@apps-in-toss/web-framework";
 import { useEffect } from "react";
 import { DevResetButton } from "./components/DevResetButton";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { WhoAmIBadge } from "./components/WhoAmIBadge";
 import { LoadingSplash } from "./components/LoadingSplash";
 import { fetchAuthStatus, getUserKey, loginWithToss } from "./lib/api";
 import { ApplyResultScreen } from "./screens/ApplyResultScreen";
@@ -129,6 +130,7 @@ function App() {
     return (
       <ErrorBoundary>
         <LoadingSplash />
+        <WhoAmIBadge />
       </ErrorBoundary>
     );
   }
@@ -140,6 +142,7 @@ function App() {
       {screen === "home" ? <HomeScreen /> : null}
       {screen === "applyResult" ? <ApplyResultScreen /> : null}
       <DevResetButton />
+      <WhoAmIBadge />
     </ErrorBoundary>
   );
 }
