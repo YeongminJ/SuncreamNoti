@@ -104,6 +104,33 @@ export async function unregisterUser(
 }
 
 /**
+ * 서버에 등록된 사용자 정보 + 슬롯 조회.
+ * 슬롯 동기화 검증용.
+ */
+export async function getServerUser(userKey: string): Promise<{
+  status: "ok" | "not_found" | "error";
+  slots?: number[];
+}> {
+  try {
+    const res = await fetch(
+      `${API_URL}/api/users/${encodeURIComponent(userKey)}`,
+    );
+    if (res.status === 404) return { status: "not_found" };
+    if (!res.ok) return { status: "error" };
+    const data = (await res.json()) as { slots?: unknown };
+    const slots = Array.isArray(data.slots)
+      ? data.slots.filter((m): m is number => typeof m === "number")
+      : [];
+    return { status: "ok", slots };
+  } catch (err) {
+    if (import.meta.env.DEV) {
+      console.warn("[api] getServerUser failed", err);
+    }
+    return { status: "error" };
+  }
+}
+
+/**
  * 진입 시점에 사용자 매핑 여부 사전 조회.
  * 매핑돼있으면 클라는 `appLogin` 호출 없이 라우팅 진행 — 매 진입마다 OAuth 2단계 호출 회피.
  */

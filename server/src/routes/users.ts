@@ -1,5 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { Hono } from "hono";
 import { z } from "zod";
 import { getDb } from "../db/client";
@@ -34,40 +35,52 @@ route.post("/", zValidator("json", upsertSchema), async (c) => {
   const db = getDb(c.env.DB);
   const now = Date.now();
 
-  await db
-    .insert(users)
-    .values({
-      userKey: body.userKey,
-      skinType: body.skinType,
-      environment: body.environment,
-      startMinute: body.startMinute,
-      endMinute: body.endMinute,
-      timezone: body.timezone,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: users.userKey,
-      set: {
+  // users upsert + 슬롯 통째 교체를 D1 batch 한 묶음으로 처리.
+  // 비트랜잭션 순차 처리 시 중간 실패로 users 행만 남고 user_slots가 비는
+  // 부분 실패가 발생해서 (cron 매칭 불가 → 알림 영구 누락) batch atomic 보장.
+  const statements: [
+    BatchItem<"sqlite">,
+    BatchItem<"sqlite">,
+    ...BatchItem<"sqlite">[],
+  ] = [
+    db
+      .insert(users)
+      .values({
+        userKey: body.userKey,
         skinType: body.skinType,
         environment: body.environment,
         startMinute: body.startMinute,
         endMinute: body.endMinute,
         timezone: body.timezone,
+        createdAt: now,
         updatedAt: now,
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: users.userKey,
+        set: {
+          skinType: body.skinType,
+          environment: body.environment,
+          startMinute: body.startMinute,
+          endMinute: body.endMinute,
+          timezone: body.timezone,
+          updatedAt: now,
+        },
+      }),
+    db.delete(userSlots).where(eq(userSlots.userKey, body.userKey)),
+  ];
 
-  // 슬롯 통째 교체 (이전 스케줄 → 새 스케줄)
-  await db.delete(userSlots).where(eq(userSlots.userKey, body.userKey));
   if (body.slotMinutes.length > 0) {
-    await db.insert(userSlots).values(
-      body.slotMinutes.map((m) => ({
-        userKey: body.userKey,
-        slotMinute: m,
-      })),
+    statements.push(
+      db.insert(userSlots).values(
+        body.slotMinutes.map((m) => ({
+          userKey: body.userKey,
+          slotMinute: m,
+        })),
+      ),
     );
   }
+
+  await db.batch(statements);
 
   return c.json({
     ok: true,

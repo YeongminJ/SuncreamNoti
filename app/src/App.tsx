@@ -6,6 +6,7 @@ import { WhoAmIBadge } from "./components/WhoAmIBadge";
 import { LoadingSplash } from "./components/LoadingSplash";
 import {
   fetchAuthStatus,
+  getServerUser,
   getUserKey,
   loginWithToss,
   registerUser,
@@ -155,6 +156,48 @@ function App() {
 
       if (res.ok && typeof res.tossUserKey === "number") {
         useAuthStore.getState().setTossUserKey(res.tossUserKey);
+      }
+    })();
+  }, [authStatus, profile]);
+
+  // 4단계: 슬롯 동기화 검증.
+  // 로컬 profile.slotMinutes와 서버 user_slots가 불일치하면 자동 재등록.
+  // users.ts 라우트가 비트랜잭션이라 5/8 사례처럼 슬롯이 비어있는 부분 실패 잔재가
+  // 생길 수 있어요 (서버는 batch로 보강됐지만 이미 만들어진 깨진 행 자동 복구용).
+  useEffect(() => {
+    if (authStatus === "idle" || authStatus === "pending") return;
+    if (!profile) return;
+
+    void (async () => {
+      const userKey = await getUserKey();
+      if (!userKey) return;
+
+      const server = await getServerUser(userKey);
+      if (server.status === "error") return;
+      // not_found는 step 3의 user_not_registered fallback이 처리 — 여기선 패스
+
+      const localSlots = [...profile.slotMinutes].sort((a, b) => a - b);
+      const serverSlots = (server.slots ?? []).slice().sort((a, b) => a - b);
+
+      const matches =
+        localSlots.length === serverSlots.length &&
+        localSlots.every((m, i) => m === serverSlots[i]);
+
+      if (!matches && localSlots.length > 0) {
+        const reg = await registerUser({
+          userKey,
+          skinType: profile.skinType,
+          environment: profile.environment,
+          startMinute: localSlots[0],
+          endMinute: localSlots[localSlots.length - 1],
+          slotMinutes: localSlots,
+        });
+        if (import.meta.env.DEV) {
+          console.debug(
+            "[app] slot mismatch resynced",
+            { local: localSlots, server: serverSlots, ok: reg.ok },
+          );
+        }
       }
     })();
   }, [authStatus, profile]);
