@@ -17,6 +17,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
  */
 const PROD_AD_GROUP_ID = "ait.v2.live.33e4a898cf514cc4";
 
+/**
+ * load 단계 타임아웃 — SDK가 loaded/onError 둘 다 안 보내는 케이스 대비.
+ * 토스 native 측에서 짧은 시간 내 같은 ad group 재호출을 silent drop하는 동작이
+ * 관찰돼서 (첫 광고 OK, 두 번째부터 무한 로딩) fallback 필수.
+ */
+const LOAD_TIMEOUT_MS = 10_000;
+/** show 단계 타임아웃 — dismissed/failedToShow 둘 다 안 오는 케이스 대비. */
+const SHOW_TIMEOUT_MS = 60_000;
+
 function resolveAdGroupId(): { id: string; isTest: boolean } {
   if (import.meta.env.DEV) {
     // 브라우저 dev에서는 SDK 미지원 → 시뮬레이션이 동작하므로 ID는 자리만 채움.
@@ -102,11 +111,27 @@ export function useRewardedAd() {
       // 이미 진행 중이면 중복 호출 무시 (사용자 빠른 더블탭 방지)
       if (inFlightRef.current) return;
 
+      console.debug("[ad] show() called, starting load", { adGroupId });
       setState("loading");
       let settled = false;
       let earned = false;
+      let loaded = false;
+      let loadTimeoutId: number | null = null;
+      let showTimeoutId: number | null = null;
+
+      const clearTimers = () => {
+        if (loadTimeoutId != null) {
+          window.clearTimeout(loadTimeoutId);
+          loadTimeoutId = null;
+        }
+        if (showTimeoutId != null) {
+          window.clearTimeout(showTimeoutId);
+          showTimeoutId = null;
+        }
+      };
 
       const cleanup = () => {
+        clearTimers();
         inFlightRef.current?.unregister?.();
         inFlightRef.current = null;
       };
@@ -120,31 +145,47 @@ export function useRewardedAd() {
       };
 
       const showLoadedAd = () => {
+        if (loadTimeoutId != null) {
+          window.clearTimeout(loadTimeoutId);
+          loadTimeoutId = null;
+        }
+        console.debug("[ad] loaded → calling showFullScreenAd");
         setState("showing");
+        // show 단계에서도 dismissed/failedToShow 모두 안 오는 케이스 방지
+        showTimeoutId = window.setTimeout(() => {
+          console.warn("[ad] show timeout — no dismissed/failedToShow in 60s");
+          setState("idle");
+          finishWith(earned);
+        }, SHOW_TIMEOUT_MS);
+
         const result = safeCall(showFullScreenAd, {
           options: { adGroupId },
           onEvent: (event) => {
             switch (event.type) {
               case "userEarnedReward":
+                console.debug("[ad] userEarnedReward");
                 earned = true;
                 break;
               case "dismissed":
+                console.debug("[ad] dismissed", { earned });
                 setState("idle");
                 finishWith(earned);
                 break;
               case "failedToShow":
+                console.warn("[ad] failedToShow event");
                 setState("idle");
                 finishWith(false);
                 break;
             }
           },
           onError: (err) => {
-            console.warn("[ad] show failed", err);
+            console.warn("[ad] show onError", err);
             setState("error");
             finishWith(false);
           },
         });
         if (result === null) {
+          console.warn("[ad] showFullScreenAd returned null");
           setState("unsupported");
           finishWith(false);
         }
@@ -155,23 +196,38 @@ export function useRewardedAd() {
         options: { adGroupId },
         onEvent: (event) => {
           if (event.type === "loaded") {
+            loaded = true;
             showLoadedAd();
           }
         },
         onError: (err) => {
-          console.warn("[ad] load failed", err);
+          console.warn("[ad] load onError", err);
           setState("error");
           finishWith(false);
         },
       });
 
       if (unregister === null) {
+        console.warn("[ad] loadFullScreenAd returned null");
         setState("unsupported");
         finishWith(false);
         return;
       }
 
       inFlightRef.current = { unregister: unregister as () => void };
+
+      // SDK가 loaded / onError 둘 다 안 보내는 케이스 대비.
+      // 토스 native 측에서 짧은 시간 내 같은 ad group 재호출 silent drop으로 추정.
+      loadTimeoutId = window.setTimeout(() => {
+        if (loaded) return;
+        console.warn(
+          "[ad] load timeout — no loaded/onError in",
+          LOAD_TIMEOUT_MS / 1000,
+          "s",
+        );
+        setState("error");
+        finishWith(false);
+      }, LOAD_TIMEOUT_MS);
     },
     [adGroupId],
   );
