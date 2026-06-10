@@ -23,7 +23,9 @@ export async function runTick(
   const kstDate = nowKstDate(fired);
   const db = getDb(env.DB);
 
-  // 1) 분 일치 + 토스 로그인 완료 사용자 후보 (slot ⨝ users)
+  // 1) 분 일치 + 토스 로그인 완료 + 알림 미해제 사용자 후보 (slot ⨝ users)
+  // notifications_disabled = 1 은 사용자가 홈 설정에서 명시적으로 끔.
+  // 토스 정책상 "수신 해제 기능 제공" 요건 충족용.
   const candidates = await db
     .select({
       userKey: users.userKey,
@@ -32,7 +34,11 @@ export async function runTick(
     .from(userSlots)
     .innerJoin(users, eq(users.userKey, userSlots.userKey))
     .where(
-      and(eq(userSlots.slotMinute, kstMinute), isNotNull(users.tossUserKey)),
+      and(
+        eq(userSlots.slotMinute, kstMinute),
+        isNotNull(users.tossUserKey),
+        eq(users.notificationsDisabled, 0),
+      ),
     )
     .all();
 

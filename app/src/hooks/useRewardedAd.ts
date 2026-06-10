@@ -3,6 +3,7 @@ import {
   showFullScreenAd,
 } from "@apps-in-toss/web-framework";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { trackClick } from "../lib/track";
 
 /**
  * 보상형 광고 그룹 ID.
@@ -113,6 +114,11 @@ export function useRewardedAd() {
 
       console.debug("[ad] show() called, starting load", { adGroupId });
       setState("loading");
+      // fill rate 디버깅용 funnel: load_start → load_succeeded/load_failed
+      // → show_rewarded/show_dismissed/show_failed.
+      // 같은 사용자의 흐름을 묶기 위해 attempt_id 발급.
+      const attemptId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      trackClick("ad_load_start", { attempt_id: attemptId });
       let settled = false;
       let earned = false;
       let loaded = false;
@@ -150,10 +156,16 @@ export function useRewardedAd() {
           loadTimeoutId = null;
         }
         console.debug("[ad] loaded → calling showFullScreenAd");
+        trackClick("ad_load_succeeded", { attempt_id: attemptId });
         setState("showing");
         // show 단계에서도 dismissed/failedToShow 모두 안 오는 케이스 방지
         showTimeoutId = window.setTimeout(() => {
           console.warn("[ad] show timeout — no dismissed/failedToShow in 60s");
+          trackClick("ad_show_failed", {
+            attempt_id: attemptId,
+            reason: "show_timeout",
+            earned,
+          });
           setState("idle");
           finishWith(earned);
         }, SHOW_TIMEOUT_MS);
@@ -164,15 +176,24 @@ export function useRewardedAd() {
             switch (event.type) {
               case "userEarnedReward":
                 console.debug("[ad] userEarnedReward");
+                trackClick("ad_show_rewarded", { attempt_id: attemptId });
                 earned = true;
                 break;
               case "dismissed":
                 console.debug("[ad] dismissed", { earned });
+                trackClick("ad_show_dismissed", {
+                  attempt_id: attemptId,
+                  earned,
+                });
                 setState("idle");
                 finishWith(earned);
                 break;
               case "failedToShow":
                 console.warn("[ad] failedToShow event");
+                trackClick("ad_show_failed", {
+                  attempt_id: attemptId,
+                  reason: "failedToShow",
+                });
                 setState("idle");
                 finishWith(false);
                 break;
@@ -180,12 +201,20 @@ export function useRewardedAd() {
           },
           onError: (err) => {
             console.warn("[ad] show onError", err);
+            trackClick("ad_show_failed", {
+              attempt_id: attemptId,
+              reason: "show_onError",
+            });
             setState("error");
             finishWith(false);
           },
         });
         if (result === null) {
           console.warn("[ad] showFullScreenAd returned null");
+          trackClick("ad_show_failed", {
+            attempt_id: attemptId,
+            reason: "show_returned_null",
+          });
           setState("unsupported");
           finishWith(false);
         }
@@ -202,6 +231,10 @@ export function useRewardedAd() {
         },
         onError: (err) => {
           console.warn("[ad] load onError", err);
+          trackClick("ad_load_failed", {
+            attempt_id: attemptId,
+            reason: "load_onError",
+          });
           setState("error");
           finishWith(false);
         },
@@ -209,6 +242,10 @@ export function useRewardedAd() {
 
       if (unregister === null) {
         console.warn("[ad] loadFullScreenAd returned null");
+        trackClick("ad_load_failed", {
+          attempt_id: attemptId,
+          reason: "load_returned_null",
+        });
         setState("unsupported");
         finishWith(false);
         return;
@@ -225,6 +262,10 @@ export function useRewardedAd() {
           LOAD_TIMEOUT_MS / 1000,
           "s",
         );
+        trackClick("ad_load_failed", {
+          attempt_id: attemptId,
+          reason: "load_timeout",
+        });
         setState("error");
         finishWith(false);
       }, LOAD_TIMEOUT_MS);

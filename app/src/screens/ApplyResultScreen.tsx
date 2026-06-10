@@ -1,16 +1,22 @@
 import { Button, Top } from "@toss/tds-mobile";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AdLoadingOverlay } from "../components/AdLoadingOverlay";
+import { BannerAdSlot } from "../components/BannerAdSlot";
 import { EmojiBubble } from "../components/EmojiBubble";
 import { useRewardedAd } from "../hooks/useRewardedAd";
 import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
+import {
+  ensureAgreedThen,
+  hasAgreedToNotifications,
+  isAgreementGatingEnabled,
+} from "../lib/notificationAgreement";
 import {
   AD_BONUS_MAX_PER_SLOT,
   adBonusRewardFor,
 } from "../lib/recommendation";
 import { trackClick, trackScreen } from "../lib/track";
 import { useAppStore } from "../store/useAppStore";
-import { useDayStore } from "../store/useDayStore";
+import { isBoostDay, useDayStore } from "../store/useDayStore";
 
 /**
  * 결과(적립 완료) + 보너스 광고 화면.
@@ -24,9 +30,15 @@ export function ApplyResultScreen() {
   const slotIndex = useAppStore((s) => s.resultSlotIndex);
   const navigate = useAppStore((s) => s.navigate);
   const day = useDayStore((s) => s.day);
+  const totals = useDayStore((s) => s.totals);
   const applySlot = useDayStore((s) => s.applySlot);
   const addAdBonus = useDayStore((s) => s.addAdBonus);
   const ad = useRewardedAd();
+  const boostActive = isBoostDay(totals);
+  // 동의 게이팅: env 없으면 gatingEnabled=false → 종전 흐름 그대로.
+  const gatingEnabled = isAgreementGatingEnabled();
+  const [hasAgreed, setHasAgreed] = useState(() => hasAgreedToNotifications());
+  const needsConsentLabel = gatingEnabled && !hasAgreed;
 
   const slot = day?.slots[slotIndex];
   const applied = slot?.appliedAt != null;
@@ -36,6 +48,7 @@ export function ApplyResultScreen() {
     trackScreen("screen_apply_result", {
       slot_index: slotIndex,
       already_applied: applied,
+      boost_active: boostActive,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -61,20 +74,65 @@ export function ApplyResultScreen() {
   // 완료 순서 기반이라 slotIndex가 아닌 이번 baseReward + 1로 표시.
   const nextSlotBaseReward = slot.baseReward + 1;
 
+  // 동의 게이팅 적용: 미동의 사용자에겐 동의 모달 먼저, 거부 시 광고 안 보여줌.
+  // env 미설정이면 ensureAgreedThen이 즉시 통과시켜 종전 흐름 그대로.
   const watchPrimaryAd = () => {
-    trackClick("press_watch_primary_ad", { slot_index: slotIndex });
-    ad.show(
-      () => applySlot(slotIndex),
-      () => console.warn("[ad] primary reward not earned"),
-    );
+    trackClick("press_watch_primary_ad", {
+      slot_index: slotIndex,
+      gating_enabled: gatingEnabled,
+      had_agreed: hasAgreed,
+    });
+    ensureAgreedThen({
+      onOutcome: (outcome) => {
+        trackClick("ad_consent_outcome", {
+          phase: "result_primary",
+          outcome,
+          slot_index: slotIndex,
+        });
+        if (outcome === "newAgreement" || outcome === "alreadyAgreed") {
+          setHasAgreed(true);
+        }
+      },
+      onAgreed: () => {
+        ad.show(
+          () => applySlot(slotIndex),
+          () => console.warn("[ad] primary reward not earned"),
+        );
+      },
+      onCancel: () => {
+        console.debug("[ad] primary consent rejected — no-op");
+      },
+    });
   };
 
   const watchBonusAd = () => {
-    trackClick("press_watch_bonus_ad", { slot_index: slotIndex });
-    ad.show(
-      () => addAdBonus(slotIndex),
-      () => console.warn("[ad] bonus reward not earned"),
-    );
+    trackClick("press_watch_bonus_ad", {
+      slot_index: slotIndex,
+      boost_active: boostActive,
+      gating_enabled: gatingEnabled,
+      had_agreed: hasAgreed,
+    });
+    ensureAgreedThen({
+      onOutcome: (outcome) => {
+        trackClick("ad_consent_outcome", {
+          phase: "result_bonus",
+          outcome,
+          slot_index: slotIndex,
+        });
+        if (outcome === "newAgreement" || outcome === "alreadyAgreed") {
+          setHasAgreed(true);
+        }
+      },
+      onAgreed: () => {
+        ad.show(
+          () => addAdBonus(slotIndex),
+          () => console.warn("[ad] bonus reward not earned"),
+        );
+      },
+      onCancel: () => {
+        console.debug("[ad] bonus consent rejected — no-op");
+      },
+    });
   };
 
   const adBusy = ad.state === "showing" || ad.state === "loading";
@@ -131,6 +189,7 @@ export function ApplyResultScreen() {
             }}
           >
             {applied ? "이번 회차 적립" : "받을 수 있는 적립금"}
+            {boostActive ? " · 🚀 부스트" : ""}
           </div>
           <div style={{ fontSize: 56, fontWeight: 900, lineHeight: 1 }}>
             {applied ? "+" : ""}
@@ -173,7 +232,6 @@ export function ApplyResultScreen() {
             </div>
             <div style={{ fontSize: 13, color: "#64748B" }}>
               남은 횟수 {adBonusLeft}/{AD_BONUS_MAX_PER_SLOT}
-              {adBonusLeft > 0 ? " · 볼수록 단가 ↑" : ""}
               {ad.isTest ? " · 테스트 광고" : ""}
             </div>
             <div style={{ marginTop: 12 }}>
@@ -192,7 +250,9 @@ export function ApplyResultScreen() {
                     ? "이번 회차 광고 다 봤어요"
                     : ad.state === "loading"
                       ? "광고 준비 중…"
-                      : `광고 보고 +${nextBonusReward}원`}
+                      : needsConsentLabel
+                        ? `알림 받고 광고 보기 (+${nextBonusReward}원)`
+                        : `광고 보고 +${nextBonusReward}원`}
               </Button>
             </div>
           </div>
@@ -211,10 +271,8 @@ export function ApplyResultScreen() {
               textAlign: "center",
             }}
           >
-            🧴 다음 회차 단가는{" "}
-            <strong>{nextSlotBaseReward}원</strong>부터 시작해요 — 회차가
-            올라갈수록, 같은 회차 안에서 광고를 더 볼수록 단가가 1원씩
-            올라가요.
+            🧴 다음 회차 단가는 <strong>{nextSlotBaseReward}원</strong>부터
+            시작해요 — 회차가 올라갈수록 단가가 1원씩 올라가요.
           </div>
         )}
 
@@ -230,6 +288,8 @@ export function ApplyResultScreen() {
             광고를 보지 않으면 적립되지 않아요
           </div>
         )}
+
+        <BannerAdSlot />
       </div>
 
       <div
@@ -275,7 +335,9 @@ export function ApplyResultScreen() {
                 ? "광고 미지원 환경"
                 : ad.state === "loading"
                   ? "광고 준비 중…"
-                  : `광고 보고 ${slot.baseReward}원 받기`}
+                  : needsConsentLabel
+                    ? `알림 받고 광고 보고 ${slot.baseReward}원 받기`
+                    : `광고 보고 ${slot.baseReward}원 받기`}
             </Button>
             <Button
               size="medium"

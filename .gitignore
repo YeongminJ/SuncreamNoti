@@ -52,6 +52,9 @@ pnpm-debug.log*
 # Vite cache
 .vite/
 
+# TypeScript build info
+*.tsbuildinfo
+
 # Apps-in-Toss build artifacts
 *.ait
 .granite/

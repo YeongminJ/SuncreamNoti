@@ -24,6 +24,11 @@ const deleteSchema = z.object({
   userKey: z.string().min(1).max(200),
 });
 
+const notificationsToggleSchema = z.object({
+  userKey: z.string().min(1).max(200),
+  disabled: z.boolean(),
+});
+
 const route = new Hono<{ Bindings: Env }>();
 
 /**
@@ -102,6 +107,40 @@ route.delete("/", zValidator("json", deleteSchema), async (c) => {
   await db.delete(users).where(eq(users.userKey, body.userKey));
   return c.json({ ok: true });
 });
+
+/**
+ * 알림 수신 on/off 토글. 홈 화면 설정 시트에서 호출.
+ *
+ * cron이 `notificationsDisabled = 0`인 사용자만 발송 대상으로 잡으므로,
+ * 이 라우트가 cron 발송 여부를 직접 제어함.
+ * 사용자 행이 없으면 404 — 온보딩 안 끝난 사용자에 대한 호출은 잘못된 흐름.
+ */
+route.post(
+  "/notifications",
+  zValidator("json", notificationsToggleSchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    const db = getDb(c.env.DB);
+
+    const existing = await db
+      .select({ userKey: users.userKey })
+      .from(users)
+      .where(eq(users.userKey, body.userKey))
+      .get();
+
+    if (!existing) return c.json({ error: "user_not_registered" }, 404);
+
+    await db
+      .update(users)
+      .set({
+        notificationsDisabled: body.disabled ? 1 : 0,
+        updatedAt: Date.now(),
+      })
+      .where(eq(users.userKey, body.userKey));
+
+    return c.json({ ok: true, disabled: body.disabled });
+  },
+);
 
 /**
  * 사용자 정보 + 슬롯 조회. 디버깅용.

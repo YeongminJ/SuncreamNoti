@@ -22,6 +22,14 @@ export const users = sqliteTable("users", {
   startMinute: integer("start_minute").notNull(),
   endMinute: integer("end_minute").notNull(),
   timezone: text("timezone").notNull().default("Asia/Seoul"),
+  /**
+   * 사용자가 알림을 끈 경우 1, 기본 0.
+   * cron 발송 시 0인 사용자만 대상으로 함.
+   *
+   * SQLite는 boolean이 따로 없어 integer로 저장. integer.mode 옵션은
+   * 기존 drizzle 호환을 위해 미사용 — application에서 0/1로만 다룬다.
+   */
+  notificationsDisabled: integer("notifications_disabled").notNull().default(0),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });

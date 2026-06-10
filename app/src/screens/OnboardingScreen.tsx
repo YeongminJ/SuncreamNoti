@@ -408,7 +408,8 @@ export function OnboardingScreen() {
               <ConsentRow
                 checked={agreedNotification}
                 onToggle={() => setAgreedNotification((v) => !v)}
-                label="선크림 알림 수신 동의"
+                label="위 시간마다 토스에서 알림 받기"
+                description="설정한 도포 시간마다 푸시·알림으로 안내해요. 홈에서 언제든 끌 수 있어요."
                 required
               />
               <ConsentRow
@@ -492,12 +493,14 @@ function ConsentRow({
   checked,
   onToggle,
   label,
+  description,
   required,
   links,
 }: {
   checked: boolean;
   onToggle: () => void;
   label: string;
+  description?: string;
   required?: boolean;
   links?: { label: string; onClick: () => void }[];
 }) {
@@ -505,7 +508,7 @@ function ConsentRow({
     <div
       style={{
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         gap: 12,
         padding: "12px 4px",
       }}
@@ -517,6 +520,7 @@ function ConsentRow({
           width: 22,
           height: 22,
           flexShrink: 0,
+          marginTop: 2,
           borderRadius: 6,
           border: `2px solid ${checked ? "#FF9B3C" : "#CBD5E1"}`,
           background: checked ? "#FF9B3C" : "#FFFFFF",
@@ -547,13 +551,35 @@ function ConsentRow({
         }}
         onClick={onToggle}
       >
-        {label}
-        {required && (
-          <span style={{ color: "#FF9B3C", marginLeft: 4 }}>(필수)</span>
+        <div>
+          {label}
+          {required && (
+            <span style={{ color: "#FF9B3C", marginLeft: 4 }}>(필수)</span>
+          )}
+        </div>
+        {description && (
+          <div
+            style={{
+              fontSize: 12,
+              color: "#64748B",
+              fontWeight: 400,
+              marginTop: 4,
+              lineHeight: 1.4,
+            }}
+          >
+            {description}
+          </div>
         )}
       </div>
       {links && (
-        <div style={{ display: "flex", gap: 12 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            flexShrink: 0,
+            marginTop: 2,
+          }}
+        >
           {links.map((l) => (
             <button
               key={l.label}

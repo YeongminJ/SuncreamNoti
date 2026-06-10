@@ -34,6 +34,25 @@ export interface Totals {
   redeemedReward: number;
   lastActiveDate: string | null;
   streak: number;
+  /** 누적 접속 일수 — 매 3일째 부스트 모드 트리거에 사용. */
+  accessCount: number;
+  /** accessCount 증분 판정용 — 오늘 처음 접속한 날짜인지 확인. */
+  lastAccessDate: string | null;
+}
+
+/** 부스트 모드(보상 2배)에 적용되는 배수. */
+export const BOOST_MULTIPLIER = 2;
+/** 부스트가 트리거되는 접속 주기 — N일마다 부스트. */
+export const BOOST_CYCLE = 3;
+
+/**
+ * 오늘이 부스트 데이인지.
+ *
+ * accessCount가 BOOST_CYCLE의 배수일 때 부스트 활성.
+ * (예: BOOST_CYCLE=3일 때 3, 6, 9... 번째 접속일 부스트.)
+ */
+export function isBoostDay(totals: Totals): boolean {
+  return totals.accessCount > 0 && totals.accessCount % BOOST_CYCLE === 0;
 }
 
 function dayStorageKey(date: string): string {
@@ -85,6 +104,9 @@ function loadTotals(): Totals {
     lastActiveDate:
       typeof raw.lastActiveDate === "string" ? raw.lastActiveDate : null,
     streak: typeof raw.streak === "number" ? raw.streak : 0,
+    accessCount: typeof raw.accessCount === "number" ? raw.accessCount : 0,
+    lastAccessDate:
+      typeof raw.lastAccessDate === "string" ? raw.lastAccessDate : null,
   };
 }
 
@@ -96,6 +118,19 @@ export const useDayStore = create<DayState>((set, get) => ({
     const date = todayKey();
     const key = dayStorageKey(date);
     const existing = readJSON<DayRecord | null>(key, null);
+
+    // 오늘 처음 접속이면 accessCount 증가 — 부스트 사이클 트리거.
+    // 같은 날 ensureToday가 여러 번 불려도 lastAccessDate 가드로 1회만 증가.
+    const totals = get().totals;
+    if (totals.lastAccessDate !== date) {
+      const updatedTotals: Totals = {
+        ...totals,
+        accessCount: totals.accessCount + 1,
+        lastAccessDate: date,
+      };
+      writeJSON(TOTALS_KEY, updatedTotals);
+      set({ totals: updatedTotals });
+    }
 
     // 슬롯 시각이 같으면 그대로 사용, 아니면 새로 생성 (기록 보존: 비교 후 maintain)
     if (
@@ -136,7 +171,11 @@ export const useDayStore = create<DayState>((set, get) => ({
 
     // 완료 순서로 baseReward 결정 (인덱스 무관).
     const completedBefore = day.slots.filter((s) => s.appliedAt != null).length;
-    const baseReward = completedBefore + 1;
+    const rawBase = completedBefore + 1;
+    // 부스트 데이엔 단가 2배. 적립 시점에 totals 기준으로 한 번만 평가.
+    const baseReward = isBoostDay(get().totals)
+      ? rawBase * BOOST_MULTIPLIER
+      : rawBase;
 
     const updatedSlot: SlotRecord = {
       ...slot,
@@ -152,12 +191,14 @@ export const useDayStore = create<DayState>((set, get) => ({
     const totals = get().totals;
     const dateChanged = totals.lastActiveDate !== day.date;
     const isFirstApplyToday = day.slots.every((s) => s.appliedAt == null);
+    // accessCount / lastAccessDate 는 ensureToday에서 이미 갱신되어 있으니
+    // spread로 보존 — 빠뜨리면 매 적립마다 부스트 사이클이 리셋돼요.
     const updatedTotals: Totals = {
+      ...totals,
       lifetimeReward: totals.lifetimeReward + updatedSlot.baseReward,
       lastActiveDate: day.date,
       // 첫 발림이면 streak 갱신
       streak: dateChanged && isFirstApplyToday ? totals.streak + 1 : totals.streak,
-      redeemedReward: totals.redeemedReward,
     };
     writeJSON(TOTALS_KEY, updatedTotals);
 
@@ -215,6 +256,8 @@ export const useDayStore = create<DayState>((set, get) => ({
       redeemedReward: 0,
       lastActiveDate: null,
       streak: 0,
+      accessCount: 0,
+      lastAccessDate: null,
     };
     writeJSON(TOTALS_KEY, t);
     set({ totals: t, day: null });

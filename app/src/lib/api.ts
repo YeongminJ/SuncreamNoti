@@ -104,6 +104,30 @@ export async function unregisterUser(
 }
 
 /**
+ * 알림 수신 on/off 토글. 서버 cron이 비활성 사용자를 발송 대상에서 제외.
+ *
+ * 사용자 행이 없으면 404 — 온보딩 안 끝났거나 registerUser 실패 케이스라
+ * 호출 측이 동기화부터 다시 시도해야 함.
+ */
+export async function setNotificationsDisabled(input: {
+  userKey: string;
+  disabled: boolean;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_URL}/api/users/notifications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
  * 서버에 등록된 사용자 정보 + 슬롯 조회.
  * 슬롯 동기화 검증용.
  */

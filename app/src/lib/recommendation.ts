@@ -133,15 +133,18 @@ export function baseRewardForCompletionOrder(completionOrder: number): number {
 export const AD_BONUS_MAX_PER_SLOT = 2;
 
 /**
- * 같은 슬롯에서 연속 광고 시청 시 단가 누진.
- * - 같은 슬롯 안에서 한 번 더 볼 때마다 1원씩 ↑
+ * 같은 슬롯에서 추가 광고 시청 시 보너스 단가.
  *
- * 예) baseReward 1원: 추가 #1: 2원 → 추가 #2: 3원
- *     baseReward 2원: 추가 #1: 3원 → 추가 #2: 4원
- *     baseReward 3원: 추가 #1: 4원 → 추가 #2: 5원
+ * 단가 정책: 추가 #N의 단가는 base + (N-1).
+ * - 추가 #1은 base와 동일, 추가 #2는 base+1.
+ * 회차가 올라가면 base가 올라가서 자연스럽게 보너스 단가도 함께 올라가요.
  *
- * 인덱스가 아니라 슬롯에 저장된 baseReward를 기준으로 누진해요.
- * 만료/완료 순서 도입으로 같은 인덱스라도 baseReward가 달라질 수 있기 때문이에요.
+ * 예) baseReward 1원: 추가 #1: 1원, 추가 #2: 2원
+ *     baseReward 2원: 추가 #1: 2원, 추가 #2: 3원
+ *     baseReward 3원: 추가 #1: 3원, 추가 #2: 4원
+ *
+ * 광고 노출당 eCPM 수익(~1.5원) 대비 보너스 단가가 너무 빠르게 올라
+ * 손익이 적자였던 걸 막기 위해 슬롯 내 누진 폭을 줄였어요.
  *
  * @param baseReward 해당 슬롯의 baseReward (applySlot 시점에 확정된 값)
  * @param bonusViewNumber 이번에 본 추가 광고 회차 (1=첫 추가, 2=두번째 추가)
@@ -150,7 +153,7 @@ export function adBonusRewardFor(
   baseReward: number,
   bonusViewNumber: number,
 ): number {
-  return baseReward + bonusViewNumber;
+  return baseReward + (bonusViewNumber - 1);
 }
 
 export function formatHm(totalMinutes: number): string {

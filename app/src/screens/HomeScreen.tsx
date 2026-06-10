@@ -4,9 +4,16 @@ import { AdLoadingOverlay } from "../components/AdLoadingOverlay";
 import { AuthFailedBanner } from "../components/AuthFailedBanner";
 import { BannerAdSlot } from "../components/BannerAdSlot";
 import { EmojiBubble } from "../components/EmojiBubble";
+import { SettingsSheet } from "../components/SettingsSheet";
 import { UvIndicator } from "../components/UvIndicator";
 import { useRewardedAd } from "../hooks/useRewardedAd";
+import { getUserKey, setNotificationsDisabled } from "../lib/api";
 import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
+import {
+  ensureAgreedThen,
+  hasAgreedToNotifications,
+  isAgreementGatingEnabled,
+} from "../lib/notificationAgreement";
 import {
   MIN_REDEEM_AMOUNT,
   PROMOTION_ENABLED,
@@ -21,7 +28,9 @@ import {
 import { trackClick, trackScreen } from "../lib/track";
 import { useAppStore } from "../store/useAppStore";
 import {
+  BOOST_MULTIPLIER,
   completedSlotCount,
+  isBoostDay,
   nextOpenSlotIndex,
   redeemableAmount,
   slotStatus,
@@ -47,6 +56,27 @@ export function HomeScreen() {
   const [redeeming, setRedeeming] = useState(false);
   const [redeemError, setRedeemError] = useState<string | null>(null);
 
+  // 알림 켜기/끄기 상태 — localStorage 미러링.
+  // 서버 sync는 토글 시 fire-and-forget, 실패 시 롤백.
+  // 토스 정책상 "수신 해제 기능" 요건 충족용 진입로.
+  const NOTIFICATIONS_DISABLED_KEY = "sunalarm.notifications.disabled.v1";
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [notificationsDisabled, setNotificationsDisabledLocal] = useState(() => {
+    try {
+      return window.localStorage.getItem(NOTIFICATIONS_DISABLED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [notifBusy, setNotifBusy] = useState(false);
+  const [notifError, setNotifError] = useState<string | null>(null);
+
+  // 동의 게이팅 활성 여부 + 사용자가 이미 동의했는지.
+  // gatingEnabled가 false면(=templateCode 미설정) 종전 동작과 동일.
+  // hasAgreed는 CTA 라벨 분기에 쓰이고, ensureAgreedThen의 onOutcome으로 갱신.
+  const gatingEnabled = isAgreementGatingEnabled();
+  const [hasAgreed, setHasAgreed] = useState(() => hasAgreedToNotifications());
+
   // 1분마다 강제 리렌더 — 카운트다운 갱신
   const [now, setNow] = useState(() => nowMinuteOfDay());
   useEffect(() => {
@@ -67,38 +97,124 @@ export function HomeScreen() {
       lifetime: totals.lifetimeReward,
       done: completedSlotCount(day),
       total_today: totalEarnedToday(day),
+      access_count: totals.accessCount,
+      boost_active: isBoostDay(totals),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const nextIdx = useMemo(() => nextOpenSlotIndex(day, now), [day, now]);
   const nextSlot = nextIdx >= 0 ? day?.slots[nextIdx] : undefined;
+  const boostActive = isBoostDay(totals);
   // "다음 회차에 받을" 미리보기 금액 = 현재까지 완료된 슬롯 수 + 1.
   // applySlot 시점에 baseReward가 동적으로 정해지므로 미리 계산해서 카드에 표시.
-  const nextBaseReward = completedSlotCount(day) + 1;
+  // 부스트 데이엔 2배로 표시 — applySlot 내부와 동일하게 곱해서 표시값과 실제값이 일치.
+  const nextBaseReward = boostActive
+    ? (completedSlotCount(day) + 1) * BOOST_MULTIPLIER
+    : completedSlotCount(day) + 1;
 
   const isUnlocked = nextSlot != null && now >= nextSlot.targetMinute;
   const minutesUntilNext =
     nextSlot != null ? Math.max(0, nextSlot.targetMinute - now) : 0;
 
-  // CTA 클릭 → 즉시 광고 노출 → 보상 시 슬롯 적립 + 결과 화면 이동
+  // CTA 클릭 → (필요 시 알림 동의) → 광고 노출 → 보상 시 슬롯 적립 + 결과 화면 이동.
+  //
+  // 동의 게이팅: templateCode가 설정돼 있고 미동의 사용자면 토스 동의 모달 먼저.
+  // 동의 거부 시 아무 동작 안 함. env가 비어있으면 ensureAgreedThen이 즉시 통과시키니
+  // 종전과 동일하게 광고만 재생.
   const handleApply = () => {
     if (!day || nextIdx < 0 || !isUnlocked) return;
     if (!ad.supported && !import.meta.env.DEV) return;
     trackClick("press_apply", {
       slot_index: nextIdx,
       ad_state: ad.state,
+      boost_active: boostActive,
+      gating_enabled: gatingEnabled,
+      had_agreed: hasAgreed,
     });
-    ad.show(
-      () => {
-        applySlot(nextIdx);
-        goToResult(nextIdx);
+    ensureAgreedThen({
+      onOutcome: (outcome) => {
+        trackClick("ad_consent_outcome", {
+          phase: "apply_primary",
+          outcome,
+          slot_index: nextIdx,
+        });
+        if (outcome === "newAgreement" || outcome === "alreadyAgreed") {
+          setHasAgreed(true);
+        }
       },
-      () => {
-        // 광고 시청 미완료 — 그대로 home에 머무름. 사용자는 다시 시도 가능.
-        console.warn("[home] primary reward not earned");
+      onAgreed: () => {
+        ad.show(
+          () => {
+            applySlot(nextIdx);
+            goToResult(nextIdx);
+          },
+          () => {
+            // 광고 시청 미완료 — 그대로 home에 머무름. 사용자는 다시 시도 가능.
+            console.warn("[home] primary reward not earned");
+          },
+        );
       },
-    );
+      onCancel: () => {
+        // 동의 거부 — 사용자 요청대로 아무 동작도 안 함.
+        // 광고 재생도, 적립도, 화면 이동도 없음.
+        console.debug("[home] consent rejected — no-op");
+      },
+    });
+  };
+
+  // 토글 핸들러: 낙관적 업데이트 + 서버 sync. 실패 시 로컬·UI 모두 복원.
+  const handleToggleNotifications = (enabled: boolean) => {
+    if (notifBusy) return;
+    const newDisabled = !enabled;
+    trackClick("press_toggle_notifications", { disabled: newDisabled });
+    setNotificationsDisabledLocal(newDisabled);
+    setNotifError(null);
+    try {
+      window.localStorage.setItem(
+        NOTIFICATIONS_DISABLED_KEY,
+        newDisabled ? "1" : "0",
+      );
+    } catch {
+      // localStorage 실패는 무시 — 다음 진입 시 서버 상태 기준으로 재동기화 필요할 수 있음.
+    }
+    setNotifBusy(true);
+    void (async () => {
+      const userKey = await getUserKey();
+      if (!userKey) {
+        setNotifBusy(false);
+        setNotifError("사용자 정보를 불러올 수 없어요.");
+        // 로컬 롤백
+        setNotificationsDisabledLocal((prev) => !prev);
+        try {
+          window.localStorage.setItem(
+            NOTIFICATIONS_DISABLED_KEY,
+            !newDisabled ? "1" : "0",
+          );
+        } catch {
+          /* noop */
+        }
+        return;
+      }
+      const res = await setNotificationsDisabled({
+        userKey,
+        disabled: newDisabled,
+      });
+      setNotifBusy(false);
+      if (!res.ok) {
+        setNotifError("잠시 후 다시 시도해 주세요.");
+        // 로컬 롤백
+        setNotificationsDisabledLocal((prev) => !prev);
+        try {
+          window.localStorage.setItem(
+            NOTIFICATIONS_DISABLED_KEY,
+            !newDisabled ? "1" : "0",
+          );
+        } catch {
+          /* noop */
+        }
+      }
+    })();
   };
 
   const redeemable = redeemableAmount(totals);
@@ -127,12 +243,15 @@ export function HomeScreen() {
 
   const allDone = nextIdx < 0;
   const adBusy = ad.state === "showing" || ad.state === "loading";
+  // 동의 게이팅이 활성이고 미동의 상태면 CTA 라벨에 동의 유도 문구 결합.
+  const needsConsentLabel = gatingEnabled && !hasAgreed;
   const ctaLabel = (() => {
     if (allDone) return "오늘 다 발랐어요 ✨";
     if (!isUnlocked) return `${formatRemaining(minutesUntilNext)} 남았어요`;
     if (ad.state === "loading") return "광고 준비 중…";
     if (ad.state === "showing") return "광고 보는 중…";
     if (!ad.supported) return "광고 미지원 환경";
+    if (needsConsentLabel) return "알림 받고 광고 보고 적립하기";
     return "광고 보고 피부 보호하기";
   })();
 
@@ -151,9 +270,73 @@ export function HomeScreen() {
             {totals.lifetimeReward}원
           </Top.SubtitleParagraph>
         }
+        right={
+          <button
+            onClick={() => {
+              trackClick("press_open_settings");
+              setSettingsOpen(true);
+            }}
+            aria-label="설정"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              background: "#F8FAFC",
+              border: "none",
+              fontSize: 18,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              WebkitTapHighlightColor: "transparent",
+              padding: 0,
+            }}
+          >
+            ⚙️
+          </button>
+        }
+      />
+
+      <SettingsSheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        notificationsEnabled={!notificationsDisabled}
+        onToggleNotifications={handleToggleNotifications}
+        busy={notifBusy}
+        errorMessage={notifError}
       />
 
       <AuthFailedBanner />
+
+      {boostActive && (
+        <div style={{ padding: "8px 24px 0" }}>
+          <div
+            style={{
+              borderRadius: 14,
+              padding: "14px 16px",
+              background:
+                "linear-gradient(135deg, #FF6B6B 0%, #FF9B3C 50%, #FFC93C 100%)",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              boxShadow: "0 4px 14px rgba(255, 107, 107, 0.25)",
+            }}
+          >
+            <span style={{ fontSize: 22 }}>🚀</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, lineHeight: 1.2 }}>
+                오늘 부스트 모드!
+              </div>
+              <div
+                style={{ fontSize: 12, marginTop: 2, opacity: 0.92 }}
+              >
+                모든 적립이 {BOOST_MULTIPLIER}배 — 3일에 한 번 찾아와요
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ padding: "8px 24px 24px" }}>
         <NextCard
