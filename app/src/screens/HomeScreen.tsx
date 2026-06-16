@@ -358,6 +358,8 @@ export function HomeScreen() {
           />
         )}
 
+        <BannerAdSlot />
+
         <div
           style={{
             display: "flex",
@@ -395,7 +397,6 @@ export function HomeScreen() {
         </div>
 
         <UvIndicator />
-        <BannerAdSlot />
       </div>
 
       <div
