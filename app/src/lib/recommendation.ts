@@ -118,7 +118,11 @@ export function recommendedSlotsFromStart(
 
 /**
  * 그날의 완료 순서로 결정되는 기본 적립.
- * - 첫 완료: 1원 → 두 번째 완료: 2원 → 세 번째: 3원 ...
+ * - 1·2번째: 1원 → 3·4번째: 2원 → 5·6번째: 3원 …
+ *
+ * 매 단계마다 base가 오르면 광고 eCPM 대비 지급이 너무 빨리 커져 손익이
+ * 나빴어요. 두 회씩 같은 단가를 유지해서 "3원 피크"가 3회차가 아닌 5회차에
+ * 오도록 완만한 곡선으로 조정.
  *
  * "슬롯 배열의 위치"가 아니라 "실제 완료 순서"를 기준으로 해요.
  * 예) 08:00을 안 바르고 11:00에 처음 발랐다면, 11:00이 첫 번째 완료 → 1원.
@@ -126,7 +130,7 @@ export function recommendedSlotsFromStart(
  * @param completionOrder 0-indexed 완료 순번 (이번 슬롯을 포함하기 전 이미 완료된 슬롯 수)
  */
 export function baseRewardForCompletionOrder(completionOrder: number): number {
-  return completionOrder + 1;
+  return Math.floor(completionOrder / 2) + 1;
 }
 
 /** 회차당 추가 광고 시청 가능 횟수 (기본 광고 제외). */
