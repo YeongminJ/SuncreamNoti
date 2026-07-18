@@ -13,6 +13,7 @@ import {
 import {
   AD_BONUS_MAX_PER_SLOT,
   adBonusRewardFor,
+  baseRewardForCompletionOrder,
 } from "../lib/recommendation";
 import { trackClick, trackScreen } from "../lib/track";
 import { useAppStore } from "../store/useAppStore";
@@ -70,9 +71,14 @@ export function ApplyResultScreen() {
     slot.baseReward,
     slot.adBonusCount + 1,
   );
-  // 다음 회차(슬롯)의 기본 단가 — "단가 올라간다" 메시지용.
-  // 완료 순서 기반이라 slotIndex가 아닌 이번 baseReward + 1로 표시.
-  const nextSlotBaseReward = slot.baseReward + 1;
+  // 다음 회차(슬롯)의 기본 단가 — "다음 회차 단가 안내" 메시지용.
+  // 완료 순서 기반: 이번 슬롯이 이미 적용됐다면 completed에 포함됨.
+  // baseRewardForCompletionOrder(next, total) — 마지막이면 2원, 아니면 1원.
+  const completedIncludingThis =
+    day?.slots.filter((s) => s.appliedAt != null).length ?? 0;
+  const nextSlotBaseReward = day
+    ? baseRewardForCompletionOrder(completedIncludingThis, day.slots.length)
+    : slot.baseReward;
 
   // 동의 게이팅 적용: 미동의 사용자에겐 동의 모달 먼저, 거부 시 광고 안 보여줌.
   // env 미설정이면 ensureAgreedThen이 즉시 통과시켜 종전 흐름 그대로.

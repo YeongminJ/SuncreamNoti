@@ -22,12 +22,14 @@ import {
 import {
   AD_BONUS_MAX_PER_SLOT,
   adBonusRewardFor,
+  baseRewardForCompletionOrder,
   formatHm,
   nowMinuteOfDay,
 } from "../lib/recommendation";
 import { trackClick, trackScreen } from "../lib/track";
 import { useAppStore } from "../store/useAppStore";
 import {
+  BOOST_CYCLE,
   BOOST_MULTIPLIER,
   completedSlotCount,
   isBoostDay,
@@ -106,12 +108,16 @@ export function HomeScreen() {
   const nextIdx = useMemo(() => nextOpenSlotIndex(day, now), [day, now]);
   const nextSlot = nextIdx >= 0 ? day?.slots[nextIdx] : undefined;
   const boostActive = isBoostDay(totals);
-  // "다음 회차에 받을" 미리보기 금액 = 현재까지 완료된 슬롯 수 + 1.
+  // "다음 회차에 받을" 미리보기 금액.
   // applySlot 시점에 baseReward가 동적으로 정해지므로 미리 계산해서 카드에 표시.
+  // baseRewardForCompletionOrder(completed, total) — 마지막이면 2원, 아니면 1원.
   // 부스트 데이엔 2배로 표시 — applySlot 내부와 동일하게 곱해서 표시값과 실제값이 일치.
+  const rawNextBase = day
+    ? baseRewardForCompletionOrder(completedSlotCount(day), day.slots.length)
+    : 1;
   const nextBaseReward = boostActive
-    ? (completedSlotCount(day) + 1) * BOOST_MULTIPLIER
-    : completedSlotCount(day) + 1;
+    ? rawNextBase * BOOST_MULTIPLIER
+    : rawNextBase;
 
   const isUnlocked = nextSlot != null && now >= nextSlot.targetMinute;
   const minutesUntilNext =
@@ -331,7 +337,8 @@ export function HomeScreen() {
               <div
                 style={{ fontSize: 12, marginTop: 2, opacity: 0.92 }}
               >
-                모든 적립이 {BOOST_MULTIPLIER}배 — 3일에 한 번 찾아와요
+                모든 적립이 {BOOST_MULTIPLIER}배 — {BOOST_CYCLE}일에 한 번
+                찾아와요
               </div>
             </div>
           </div>

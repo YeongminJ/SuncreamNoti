@@ -3,6 +3,7 @@ import { readJSON, writeJSON } from "../lib/storage";
 import {
   AD_BONUS_MAX_PER_SLOT,
   adBonusRewardFor,
+  baseRewardForCompletionOrder,
   nowMinuteOfDay,
   todayKey,
 } from "../lib/recommendation";
@@ -42,14 +43,19 @@ export interface Totals {
 
 /** 부스트 모드(보상 2배)에 적용되는 배수. */
 export const BOOST_MULTIPLIER = 2;
-/** 부스트가 트리거되는 접속 주기 — N일마다 부스트. */
-export const BOOST_CYCLE = 3;
+/**
+ * 부스트가 트리거되는 접속 주기 — N번째 활동일마다 부스트.
+ *
+ * `accessCount`는 `ensureToday`에서 `lastAccessDate !== today`일 때만 증가하므로
+ * 같은 날 여러 번 진입해도 하루 1회만 오름 → 실제 "활동 N일차"에 부스트.
+ */
+export const BOOST_CYCLE = 4;
 
 /**
  * 오늘이 부스트 데이인지.
  *
  * accessCount가 BOOST_CYCLE의 배수일 때 부스트 활성.
- * (예: BOOST_CYCLE=3일 때 3, 6, 9... 번째 접속일 부스트.)
+ * (예: BOOST_CYCLE=4일 때 4, 8, 12... 번째 활동일 부스트.)
  */
 export function isBoostDay(totals: Totals): boolean {
   return totals.accessCount > 0 && totals.accessCount % BOOST_CYCLE === 0;
@@ -170,8 +176,12 @@ export const useDayStore = create<DayState>((set, get) => ({
     if (isSlotExpired(day, slotIndex, nowMinuteOfDay())) return slot;
 
     // 완료 순서로 baseReward 결정 (인덱스 무관).
+    // 마지막 완료만 2원, 나머지는 1원 — baseRewardForCompletionOrder 참고.
     const completedBefore = day.slots.filter((s) => s.appliedAt != null).length;
-    const rawBase = completedBefore + 1;
+    const rawBase = baseRewardForCompletionOrder(
+      completedBefore,
+      day.slots.length,
+    );
     // 부스트 데이엔 단가 2배. 적립 시점에 totals 기준으로 한 번만 평가.
     const baseReward = isBoostDay(get().totals)
       ? rawBase * BOOST_MULTIPLIER

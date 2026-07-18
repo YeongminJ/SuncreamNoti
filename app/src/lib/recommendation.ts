@@ -118,19 +118,27 @@ export function recommendedSlotsFromStart(
 
 /**
  * 그날의 완료 순서로 결정되는 기본 적립.
- * - 1·2번째: 1원 → 3·4번째: 2원 → 5·6번째: 3원 …
  *
- * 매 단계마다 base가 오르면 광고 eCPM 대비 지급이 너무 빨리 커져 손익이
- * 나빴어요. 두 회씩 같은 단가를 유지해서 "3원 피크"가 3회차가 아닌 5회차에
- * 오도록 완만한 곡선으로 조정.
+ * 정책: **마지막 완료만 2원, 나머지는 전부 1원**.
+ * - 예) 6슬롯 사용자: 1·2·3·4·5회차 → 1원(1,1,2 시퀀스),
+ *        6회차(마지막) → 2원(2,2,3 시퀀스)
+ * - 예) 4슬롯 사용자: 1·2·3회차 → 1원, 4회차 → 2원
+ *
+ * 광고 eCPM(~1.5원) 대비 base가 커지면 활성 사용자에서 손익이 마이너스가 돼
+ * 최대한 평평하게 유지하고, "마지막까지 완주"에 대한 리텐션 인센티브로만
+ * 마지막 슬롯에 소폭 상향을 걸어요.
  *
  * "슬롯 배열의 위치"가 아니라 "실제 완료 순서"를 기준으로 해요.
  * 예) 08:00을 안 바르고 11:00에 처음 발랐다면, 11:00이 첫 번째 완료 → 1원.
  *
  * @param completionOrder 0-indexed 완료 순번 (이번 슬롯을 포함하기 전 이미 완료된 슬롯 수)
+ * @param totalSlotCount 그날 총 슬롯 수 — 마지막인지 판정용
  */
-export function baseRewardForCompletionOrder(completionOrder: number): number {
-  return Math.floor(completionOrder / 2) + 1;
+export function baseRewardForCompletionOrder(
+  completionOrder: number,
+  totalSlotCount: number,
+): number {
+  return completionOrder >= totalSlotCount - 1 ? 2 : 1;
 }
 
 /** 회차당 추가 광고 시청 가능 횟수 (기본 광고 제외). */
