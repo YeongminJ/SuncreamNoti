@@ -17,7 +17,7 @@ import {
 } from "../lib/recommendation";
 import { trackClick, trackScreen } from "../lib/track";
 import { useAppStore } from "../store/useAppStore";
-import { isBoostDay, useDayStore } from "../store/useDayStore";
+import { useDayStore } from "../store/useDayStore";
 
 /**
  * 결과(적립 완료) + 보너스 광고 화면.
@@ -31,11 +31,9 @@ export function ApplyResultScreen() {
   const slotIndex = useAppStore((s) => s.resultSlotIndex);
   const navigate = useAppStore((s) => s.navigate);
   const day = useDayStore((s) => s.day);
-  const totals = useDayStore((s) => s.totals);
   const applySlot = useDayStore((s) => s.applySlot);
   const addAdBonus = useDayStore((s) => s.addAdBonus);
   const ad = useRewardedAd();
-  const boostActive = isBoostDay(totals);
   // 동의 게이팅: env 없으면 gatingEnabled=false → 종전 흐름 그대로.
   const gatingEnabled = isAgreementGatingEnabled();
   const [hasAgreed, setHasAgreed] = useState(() => hasAgreedToNotifications());
@@ -49,7 +47,6 @@ export function ApplyResultScreen() {
     trackScreen("screen_apply_result", {
       slot_index: slotIndex,
       already_applied: applied,
-      boost_active: boostActive,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -114,7 +111,6 @@ export function ApplyResultScreen() {
   const watchBonusAd = () => {
     trackClick("press_watch_bonus_ad", {
       slot_index: slotIndex,
-      boost_active: boostActive,
       gating_enabled: gatingEnabled,
       had_agreed: hasAgreed,
     });
@@ -195,7 +191,6 @@ export function ApplyResultScreen() {
             }}
           >
             {applied ? "이번 회차 적립" : "받을 수 있는 적립금"}
-            {boostActive ? " · 🚀 부스트" : ""}
           </div>
           <div style={{ fontSize: 56, fontWeight: 900, lineHeight: 1 }}>
             {applied ? "+" : ""}

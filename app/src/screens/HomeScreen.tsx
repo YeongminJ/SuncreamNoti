@@ -29,10 +29,7 @@ import {
 import { trackClick, trackScreen } from "../lib/track";
 import { useAppStore } from "../store/useAppStore";
 import {
-  BOOST_CYCLE,
-  BOOST_MULTIPLIER,
   completedSlotCount,
-  isBoostDay,
   nextOpenSlotIndex,
   redeemableAmount,
   slotStatus,
@@ -100,24 +97,17 @@ export function HomeScreen() {
       done: completedSlotCount(day),
       total_today: totalEarnedToday(day),
       access_count: totals.accessCount,
-      boost_active: isBoostDay(totals),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const nextIdx = useMemo(() => nextOpenSlotIndex(day, now), [day, now]);
   const nextSlot = nextIdx >= 0 ? day?.slots[nextIdx] : undefined;
-  const boostActive = isBoostDay(totals);
   // "다음 회차에 받을" 미리보기 금액.
-  // applySlot 시점에 baseReward가 동적으로 정해지므로 미리 계산해서 카드에 표시.
   // baseRewardForCompletionOrder(completed, total) — 마지막이면 2원, 아니면 1원.
-  // 부스트 데이엔 2배로 표시 — applySlot 내부와 동일하게 곱해서 표시값과 실제값이 일치.
-  const rawNextBase = day
+  const nextBaseReward = day
     ? baseRewardForCompletionOrder(completedSlotCount(day), day.slots.length)
     : 1;
-  const nextBaseReward = boostActive
-    ? rawNextBase * BOOST_MULTIPLIER
-    : rawNextBase;
 
   const isUnlocked = nextSlot != null && now >= nextSlot.targetMinute;
   const minutesUntilNext =
@@ -134,7 +124,6 @@ export function HomeScreen() {
     trackClick("press_apply", {
       slot_index: nextIdx,
       ad_state: ad.state,
-      boost_active: boostActive,
       gating_enabled: gatingEnabled,
       had_agreed: hasAgreed,
     });
@@ -313,37 +302,6 @@ export function HomeScreen() {
       />
 
       <AuthFailedBanner />
-
-      {boostActive && (
-        <div style={{ padding: "8px 24px 0" }}>
-          <div
-            style={{
-              borderRadius: 14,
-              padding: "14px 16px",
-              background:
-                "linear-gradient(135deg, #FF6B6B 0%, #FF9B3C 50%, #FFC93C 100%)",
-              color: "#fff",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              boxShadow: "0 4px 14px rgba(255, 107, 107, 0.25)",
-            }}
-          >
-            <span style={{ fontSize: 22 }}>🚀</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, lineHeight: 1.2 }}>
-                오늘 부스트 모드!
-              </div>
-              <div
-                style={{ fontSize: 12, marginTop: 2, opacity: 0.92 }}
-              >
-                모든 적립이 {BOOST_MULTIPLIER}배 — {BOOST_CYCLE}일에 한 번
-                찾아와요
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div style={{ padding: "8px 24px 24px" }}>
         <NextCard
