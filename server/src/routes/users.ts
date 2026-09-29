@@ -29,6 +29,15 @@ const notificationsToggleSchema = z.object({
   disabled: z.boolean(),
 });
 
+const notificationAgreementSchema = z.object({
+  userKey: z.string().min(1).max(200),
+  /**
+   * true  → notification_agreed_at 을 지금 시각(ms)으로 세팅.
+   * false → NULL 로 초기화(사용자가 명시적으로 철회하면 호출; 현재는 사용 안 함).
+   */
+  agreed: z.boolean(),
+});
+
 const route = new Hono<{ Bindings: Env }>();
 
 /**
@@ -139,6 +148,46 @@ route.post(
       .where(eq(users.userKey, body.userKey));
 
     return c.json({ ok: true, disabled: body.disabled });
+  },
+);
+
+/**
+ * 토스 `Notification.requestAgreement` 결과를 서버에 반영.
+ *
+ * cron은 `notification_agreed_at IS NOT NULL`인 사용자에게만 발송하므로,
+ * 클라가 온보딩 직후 또는 홈 첫 진입 시 동의 승인/이미승인 이벤트를 받으면
+ * 이 엔드포인트로 시각을 기록해줘야 함.
+ * 사용자 행이 없으면 404 — 온보딩(`POST /api/users`) 먼저 이뤄져야 함.
+ */
+route.post(
+  "/notification-agreement",
+  zValidator("json", notificationAgreementSchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    const db = getDb(c.env.DB);
+
+    const existing = await db
+      .select({ userKey: users.userKey })
+      .from(users)
+      .where(eq(users.userKey, body.userKey))
+      .get();
+
+    if (!existing) return c.json({ error: "user_not_registered" }, 404);
+
+    const now = Date.now();
+    await db
+      .update(users)
+      .set({
+        notificationAgreedAt: body.agreed ? now : null,
+        updatedAt: now,
+      })
+      .where(eq(users.userKey, body.userKey));
+
+    return c.json({
+      ok: true,
+      agreed: body.agreed,
+      agreedAt: body.agreed ? now : null,
+    });
   },
 );
 

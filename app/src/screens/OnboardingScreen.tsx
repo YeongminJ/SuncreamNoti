@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { EmojiBubble } from "../components/EmojiBubble";
 import { LegalSheet, type LegalKind } from "../components/LegalSheet";
 import { getUserKey, loginWithToss, registerUser } from "../lib/api";
+import { ensureAgreedThen } from "../lib/notificationAgreement";
 import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
 import {
   formatHm,
@@ -139,6 +140,19 @@ export function OnboardingScreen() {
         slotMinutes: sortedSlots,
       });
       if (!reg.ok) return;
+
+      // 토스 정책상 리마인더/이벤트 유형 발송 전 사용자 동의 필요.
+      // 온보딩 완료 시점에 토스 네이티브 동의 모달을 띄우고, 성공 시
+      // 서버 `notification_agreed_at`도 자동 반영(ensureAgreedThen 내부에서).
+      // 사용자가 거부해도 흐름을 막지 않음 — 다음 광고 CTA에서 다시 시도됨.
+      ensureAgreedThen({
+        onAgreed: () => {
+          /* noop — 서버 반영은 helper 내부에서 처리 */
+        },
+        onOutcome: (outcome) => {
+          trackClick("notification_agreement_outcome_onboarding", { outcome });
+        },
+      });
 
       // 진입 시점(App.tsx)에서 받아둔 토스 인가코드를 재사용.
       // 토스 환경이 아니거나 사용자가 거부한 경우엔 스킵.

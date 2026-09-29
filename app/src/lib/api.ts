@@ -128,6 +128,34 @@ export async function setNotificationsDisabled(input: {
 }
 
 /**
+ * 알림 동의 상태를 서버에 반영.
+ *
+ * 토스 정책상 이벤트/리마인더 유형 발송은 사용자 동의가 있어야 함. cron은
+ * `notification_agreed_at` 이 채워진 사용자에게만 발송하므로,
+ * `Notification.requestAgreement` 응답이 newAgreement/alreadyAgreed일 때
+ * 이 함수로 시각을 기록해줘야 함.
+ *
+ * 사용자 행이 없으면 404 (온보딩 이전 호출) — 실패 시 다음 진입에서 다시 시도.
+ */
+export async function setNotificationAgreement(input: {
+  userKey: string;
+  agreed: boolean;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_URL}/api/users/notification-agreement`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
  * 서버에 등록된 사용자 정보 + 슬롯 조회.
  * 슬롯 동기화 검증용.
  */

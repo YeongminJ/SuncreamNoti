@@ -168,12 +168,25 @@ export function createRealTossClient(env: Env): TossClient {
     async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
       try {
         const fetcher = getMtlsFetcher(env);
+        // 사용자 식별 헤더: anonKey(권장) > tossUserKey(하위호환) 순으로 선택.
+        // 2026-07-16 hash 인증 도입 이후, getAnonymousKey().hash 값을 그대로
+        // x-anon-key로 사용 가능해 토스 로그인(loginMe) 완료 여부와 무관하게 발송.
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (input.anonKey) {
+          headers["x-anon-key"] = input.anonKey;
+        } else if (input.tossUserKey != null) {
+          headers["x-toss-user-key"] = String(input.tossUserKey);
+        } else {
+          return {
+            ok: false,
+            error: "sendMessage requires anonKey or tossUserKey",
+          };
+        }
         const res = await fetcher.fetch(`${baseUrl}${PATH_SEND_MESSAGE}`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-toss-user-key": String(input.tossUserKey),
-          },
+          headers,
           body: JSON.stringify({
             templateSetCode: input.templateSetCode,
             context: input.context ?? {},

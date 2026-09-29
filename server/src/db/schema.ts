@@ -9,8 +9,12 @@ import {
 /**
  * 사용자 한 명당 1행.
  * - `user_key`: 우리 시스템 PK. 토스 `getAnonymousKey()` hash. 클라가 보냄.
- * - `toss_user_key`: 토스 `loginMe`로 받은 numeric userKey. sendMessage의 `x-toss-user-key`.
- *   토스 로그인 전엔 NULL. NULL인 동안엔 cron이 발송 대상에서 제외.
+ *   2026-07-16 hash 인증 도입 이후엔 sendMessage의 `x-anon-key`로도 그대로 사용.
+ * - `toss_user_key`: 토스 `loginMe`로 받은 numeric userKey. hash 방식 전환 이전
+ *   `x-toss-user-key` 헤더용으로 채워져 있던 값. 신규 발송 경로는 `user_key`를
+ *   그대로 x-anon-key로 사용하므로 NULL이어도 무방. 하위호환/디버깅 용도로 보존.
+ * - `notification_agreed_at`: 토스 `Notification.requestAgreement` 승인 시각(ms).
+ *   NULL이면 미동의 상태. cron은 이 값이 채워진 사용자에게만 발송.
  *
  * 슬롯 시각은 정규화된 `user_slots` 테이블에 저장.
  */
@@ -30,6 +34,13 @@ export const users = sqliteTable("users", {
    * 기존 drizzle 호환을 위해 미사용 — application에서 0/1로만 다룬다.
    */
   notificationsDisabled: integer("notifications_disabled").notNull().default(0),
+  /**
+   * `Notification.requestAgreement` 응답이 newAgreement/alreadyAgreed인 시각(ms).
+   * 토스 정책상 재입고·이벤트·리마인더 유형 메시지는 사전 동의 없이는 발송 불가.
+   * NULL이면 cron이 해당 사용자를 건너뜀 — 5/15 이전에 등록됐던 사용자도
+   * 다음 진입 시 동의 확보되면 자동으로 발송 대상에 편입.
+   */
+  notificationAgreedAt: integer("notification_agreed_at"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });

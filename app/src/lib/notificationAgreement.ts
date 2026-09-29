@@ -1,4 +1,5 @@
-import * as appsInTossSdk from "@apps-in-toss/web-framework";
+import { requestNotificationAgreement } from "@apps-in-toss/web-framework";
+import { getUserKey, setNotificationAgreement } from "./api";
 
 /**
  * 토스 알림 동의 게이팅 헬퍼.
@@ -13,40 +14,25 @@ import * as appsInTossSdk from "@apps-in-toss/web-framework";
  * 동의 결과는 localStorage 미러링 — 토스 SDK 자체도 alreadyAgreed를 반환하지만
  * 매번 SDK 호출 비용을 줄이려고 클라 단에서 한 번 더 캐싱해요.
  *
- * **SDK 버전 주의**: `requestNotificationAgreement` 는 @apps-in-toss/web-framework
- * 2.5+ 에 추가된 API. 현재 설치 버전(2.4.x)에는 export가 없어서 namespace import 후
- * 동적 조회로 안전망 처리. SDK 업그레이드 시 자동으로 함수가 살아나요.
+ * newAgreement/alreadyAgreed 이벤트를 받으면 서버에도 `notification_agreed_at`을
+ * 저장해요 — cron이 이 값을 보고 발송 대상을 결정하므로 반드시 동기화 필요.
+ *
+ * **SDK 요구**: `requestNotificationAgreement`는 @apps-in-toss/web-framework 2.5+.
+ * 이 앱은 ^2.8을 사용하므로 직접 named import.
  *
  * **콘솔 등록 필요**: `VITE_NOTIFICATION_TEMPLATE_CODE`에 토스 콘솔에서
  * 발급된 알림 동의문 코드를 넣어야 동의 모달이 실제로 떠요.
  */
 
 const AGREED_KEY = "sunalarm.notification.agreed.v1";
+/**
+ * 로컬에서 이미 동의됐다고 캐시되어 있지만 서버에도 반영됐는지 여부.
+ * `notification_agreed_at` 컬럼 도입 이전부터 사용해오던 사용자를 위한 지연 동기화용.
+ */
+const AGREED_SERVER_SYNCED_KEY = "sunalarm.notification.agreed.serverSynced.v1";
 const TEMPLATE_CODE = (
   import.meta.env.VITE_NOTIFICATION_TEMPLATE_CODE as string | undefined
 )?.trim();
-
-type NotificationAgreementResult =
-  | "newAgreement"
-  | "alreadyAgreed"
-  | "agreementRejected";
-
-type RequestNotificationAgreementParams = {
-  options: { templateCode: string };
-  onEvent: (result: { type: NotificationAgreementResult }) => void;
-  onError: (err: unknown) => void | Promise<void>;
-};
-
-type RequestNotificationAgreementFn = ((
-  params: RequestNotificationAgreementParams,
-) => () => void) & {
-  isSupported?: () => boolean;
-};
-
-// SDK 2.4.x에는 export가 없을 수 있어 런타임 동적 조회. 2.5+에선 정상 함수.
-const requestNotificationAgreement = (
-  appsInTossSdk as unknown as Record<string, unknown>
-).requestNotificationAgreement as RequestNotificationAgreementFn | undefined;
 
 function safeIsSupported(
   fn: { isSupported?: () => boolean } | undefined,
@@ -54,6 +40,37 @@ function safeIsSupported(
   if (!fn || typeof fn.isSupported !== "function") return false;
   try {
     return fn.isSupported();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 동의 성공 시 서버에도 시각 기록. 로컬 캐시를 먼저 세운 뒤 서버 호출은
+ * fire-and-forget — 실패해도 다음 진입 시 재시도할 수 있도록 별도 락 없음.
+ * userKey 조회가 실패하면 서버 호출은 스킵(다음 온라인 진입 때 다시 시도).
+ * 성공 시 serverSynced 플래그를 남겨 재진입에서 중복 호출을 막아요.
+ */
+async function persistAgreementToServer(): Promise<void> {
+  try {
+    const userKey = await getUserKey();
+    if (!userKey) return;
+    const res = await setNotificationAgreement({ userKey, agreed: true });
+    if (res.ok) {
+      try {
+        window.localStorage.setItem(AGREED_SERVER_SYNCED_KEY, "1");
+      } catch {
+        /* noop */
+      }
+    }
+  } catch (err) {
+    console.warn("[notif] persistAgreementToServer failed", err);
+  }
+}
+
+function isServerSyncedLocally(): boolean {
+  try {
+    return window.localStorage.getItem(AGREED_SERVER_SYNCED_KEY) === "1";
   } catch {
     return false;
   }
@@ -83,6 +100,8 @@ function markAgreed(): void {
   } catch {
     /* noop */
   }
+  // 로컬 캐시가 잡히자마자 서버에도 반영 시도 (실패는 무시 — 다음 진입에 재시도).
+  void persistAgreementToServer();
 }
 
 export type AgreementOutcome =
@@ -109,6 +128,10 @@ export function ensureAgreedThen(opts: {
   const { onAgreed, onCancel, onOutcome } = opts;
 
   if (hasAgreedToNotifications()) {
+    // 서버 반영이 아직 안 된 옛 사용자면 지연 동기화. 캐시 플래그로 중복 방지.
+    if (!isServerSyncedLocally()) {
+      void persistAgreementToServer();
+    }
     onOutcome?.("alreadyAgreedLocal");
     onAgreed();
     return;
