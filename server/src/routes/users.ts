@@ -16,7 +16,7 @@ const upsertSchema = z.object({
   slotMinutes: z
     .array(z.number().int().min(0).max(1439))
     .min(1)
-    .max(8),
+    .max(4),
   timezone: z.string().default("Asia/Seoul"),
 });
 

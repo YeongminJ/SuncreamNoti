@@ -32,7 +32,7 @@ const HOUR_GRID: number[] = Array.from(
   { length: 11 },
   (_, i) => (6 + i) * 60,
 );
-const MAX_SLOTS = 6;
+const MAX_SLOTS = 4;
 const DEFAULT_START_MINUTE = 8 * 60;
 
 export function OnboardingScreen() {

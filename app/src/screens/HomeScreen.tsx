@@ -4,10 +4,11 @@ import { AdLoadingOverlay } from "../components/AdLoadingOverlay";
 import { AuthFailedBanner } from "../components/AuthFailedBanner";
 import { BannerAdSlot } from "../components/BannerAdSlot";
 import { EmojiBubble } from "../components/EmojiBubble";
+import { ScheduleEditSheet } from "../components/ScheduleEditSheet";
 import { SettingsSheet } from "../components/SettingsSheet";
 import { UvIndicator } from "../components/UvIndicator";
 import { useRewardedAd } from "../hooks/useRewardedAd";
-import { getUserKey, setNotificationsDisabled } from "../lib/api";
+import { getUserKey, registerUser, setNotificationsDisabled } from "../lib/api";
 import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
 import {
   ensureAgreedThen,
@@ -42,6 +43,7 @@ import { useProfileStore } from "../store/useProfileStore";
 export function HomeScreen() {
   const goToResult = useAppStore((s) => s.goToResult);
   const profile = useProfileStore((s) => s.profile);
+  const setProfile = useProfileStore((s) => s.setProfile);
   const slotsForToday = useProfileStore((s) => s.slotsForToday);
   const ensureToday = useDayStore((s) => s.ensureToday);
   const day = useDayStore((s) => s.day);
@@ -60,6 +62,10 @@ export function HomeScreen() {
   // 토스 정책상 "수신 해제 기능" 요건 충족용 진입로.
   const NOTIFICATIONS_DISABLED_KEY = "sunalarm.notifications.disabled.v1";
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleSyncError, setScheduleSyncError] = useState<string | null>(
+    null,
+  );
   const [notificationsDisabled, setNotificationsDisabledLocal] = useState(() => {
     try {
       return window.localStorage.getItem(NOTIFICATIONS_DISABLED_KEY) === "1";
@@ -103,6 +109,17 @@ export function HomeScreen() {
 
   const nextIdx = useMemo(() => nextOpenSlotIndex(day, now), [day, now]);
   const nextSlot = nextIdx >= 0 ? day?.slots[nextIdx] : undefined;
+  const currentSlotMinutes = useMemo(
+    () => day?.slots.map((slot) => slot.targetMinute) ?? [],
+    [day],
+  );
+  const lockedSlotMinutes = useMemo(
+    () =>
+      day?.slots
+        .filter((slot) => slot.appliedAt != null)
+        .map((slot) => slot.targetMinute) ?? [],
+    [day],
+  );
   // "다음 회차에 받을" 미리보기 금액.
   // baseRewardForCompletionOrder(completed, total) — 마지막이면 2원, 아니면 1원.
   const nextBaseReward = day
@@ -212,6 +229,35 @@ export function HomeScreen() {
     })();
   };
 
+  const syncScheduleToServer = async (slotMinutes: number[]) => {
+    if (!profile || slotMinutes.length === 0) return;
+    const userKey = await getUserKey();
+    if (!userKey) {
+      setScheduleSyncError("서버 알림 반영에 필요한 사용자 정보를 불러오지 못했어요.");
+      return;
+    }
+    const res = await registerUser({
+      userKey,
+      skinType: profile.skinType,
+      environment: profile.environment,
+      startMinute: slotMinutes[0],
+      endMinute: slotMinutes[slotMinutes.length - 1],
+      slotMinutes,
+    });
+    setScheduleSyncError(res.ok ? null : "서버 알림 반영이 지연되고 있어요.");
+  };
+
+  const handleApplySchedule = (slotMinutes: number[]) => {
+    if (!profile || slotMinutes.length === 0) return;
+    const sorted = [...slotMinutes].sort((a, b) => a - b);
+    trackClick("press_apply_schedule_edit", { slots: sorted.length });
+    setProfile({ ...profile, slotMinutes: sorted });
+    ensureToday(sorted);
+    setScheduleOpen(false);
+    setScheduleSyncError(null);
+    void syncScheduleToServer(sorted);
+  };
+
   const redeemable = redeemableAmount(totals);
   const canRedeem = redeemable >= MIN_REDEEM_AMOUNT;
   const handleRedeem = async () => {
@@ -301,6 +347,14 @@ export function HomeScreen() {
         errorMessage={notifError}
       />
 
+      <ScheduleEditSheet
+        open={scheduleOpen}
+        currentSlots={currentSlotMinutes}
+        lockedSlots={lockedSlotMinutes}
+        onClose={() => setScheduleOpen(false)}
+        onApply={handleApplySchedule}
+      />
+
       <AuthFailedBanner />
 
       <div style={{ padding: "8px 24px 24px" }}>
@@ -344,10 +398,40 @@ export function HomeScreen() {
           >
             오늘의 권장 시간
           </h3>
-          <span style={{ fontSize: 12, color: "#FF7E2E", fontWeight: 600 }}>
-            바를수록 단가 ↑
-          </span>
+          <button
+            type="button"
+            onClick={() => setScheduleOpen(true)}
+            style={{
+              border: "1px solid #FFD9C2",
+              background: "#FFF3EC",
+              color: "#FF7E2E",
+              borderRadius: 999,
+              padding: "6px 10px",
+              fontSize: 12,
+              fontWeight: 800,
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            수정
+          </button>
         </div>
+
+        {scheduleSyncError && (
+          <div
+            style={{
+              margin: "-4px 0 10px",
+              color: "#B91C1C",
+              background: "#FEF2F2",
+              borderRadius: 10,
+              padding: "8px 10px",
+              fontSize: 12,
+              lineHeight: 1.4,
+            }}
+          >
+            {scheduleSyncError}
+          </div>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {day.slots.map((slot, i) => (
