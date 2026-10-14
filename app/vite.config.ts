@@ -1,6 +1,8 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
+import aitDevtools from "@apps-in-toss/devtools/unplugin";
+
 // 빌드 가드: prod 빌드 시 VITE_API_URL 누락/localhost면 빌드 차단.
 // 5/15 사고 — .env.local 없이 빌드해서 모든 사용자 번들에 localhost가 박혀
 // 서버 호출이 전부 실패했던 사고 재발 방지.
@@ -20,6 +22,6 @@ export default defineConfig(({ command, mode }) => {
     }
   }
   return {
-    plugins: [react()],
+    plugins: [aitDevtools.vite(), react()],
   };
 });
