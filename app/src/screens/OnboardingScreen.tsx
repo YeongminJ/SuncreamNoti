@@ -2,7 +2,8 @@ import { Button, Top } from "@toss/tds-mobile";
 import { useEffect, useMemo, useState } from "react";
 import { EmojiBubble } from "../components/EmojiBubble";
 import { LegalSheet, type LegalKind } from "../components/LegalSheet";
-import { getUserKey, loginWithToss, registerUser } from "../lib/api";
+import { getUserKey, registerUser } from "../lib/api";
+import { useBackHandler } from "../lib/backHandler";
 import { ensureAgreedThen } from "../lib/notificationAgreement";
 import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
 import {
@@ -15,7 +16,6 @@ import {
 } from "../lib/recommendation";
 import { trackClick, trackScreen } from "../lib/track";
 import { useAppStore } from "../store/useAppStore";
-import { useAuthStore } from "../store/useAuthStore";
 import { useProfileStore } from "../store/useProfileStore";
 
 const SKIN_TYPES: SkinType[] = ["I", "II", "III", "IV", "V_VI"];
@@ -71,6 +71,8 @@ export function OnboardingScreen() {
   useEffect(() => {
     trackScreen("screen_onboarding", { step });
   }, [step]);
+
+  useBackHandler(step > 1, () => setStep((s) => (s - 1) as 1 | 2 | 3));
 
   const sortedSlots = useMemo(
     () => [...selectedSlots].sort((a, b) => a - b),
@@ -153,22 +155,6 @@ export function OnboardingScreen() {
           trackClick("notification_agreement_outcome_onboarding", { outcome });
         },
       });
-
-      // 진입 시점(App.tsx)에서 받아둔 토스 인가코드를 재사용.
-      // 토스 환경이 아니거나 사용자가 거부한 경우엔 스킵.
-      const { authorizationCode, referrer, tossUserKey } =
-        useAuthStore.getState();
-      if (!authorizationCode || !referrer) return;
-      if (tossUserKey != null) return;
-
-      const result = await loginWithToss({
-        userKey,
-        authorizationCode,
-        referrer,
-      });
-      if (result.ok && typeof result.tossUserKey === "number") {
-        useAuthStore.getState().setTossUserKey(result.tossUserKey);
-      }
     })();
 
     navigate("home");

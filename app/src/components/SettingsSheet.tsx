@@ -1,4 +1,5 @@
 import { BottomSheet, Switch } from "@toss/tds-mobile";
+import { useBackHandler } from "../lib/backHandler";
 
 interface Props {
   open: boolean;
@@ -24,6 +25,7 @@ export function SettingsSheet({
   busy,
   errorMessage,
 }: Props) {
+  useBackHandler(open, onClose);
   return (
     <BottomSheet
       open={open}

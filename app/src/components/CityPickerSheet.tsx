@@ -1,5 +1,6 @@
 import { BottomSheet } from "@toss/tds-mobile";
 import type { CityOption } from "../hooks/useUvIndex";
+import { useBackHandler } from "../lib/backHandler";
 
 interface Props {
   open: boolean;
@@ -20,6 +21,7 @@ export function CityPickerSheet({
   selectedId,
   onSelect,
 }: Props) {
+  useBackHandler(open, onClose);
   return (
     <BottomSheet
       open={open}

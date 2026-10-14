@@ -1,5 +1,6 @@
 import { BottomSheet, Button } from "@toss/tds-mobile";
 import { useEffect, useMemo, useState } from "react";
+import { useBackHandler } from "../lib/backHandler";
 import { CTA_GRADIENT_STYLE } from "../lib/buttonStyle";
 import { formatHm } from "../lib/recommendation";
 
@@ -33,6 +34,8 @@ export function ScheduleEditSheet({
     if (!open) return;
     setSelectedSlots(new Set(currentSlots));
   }, [open, currentSlots]);
+
+  useBackHandler(open, onClose);
 
   const sortedSlots = useMemo(
     () => [...selectedSlots].sort((a, b) => a - b),

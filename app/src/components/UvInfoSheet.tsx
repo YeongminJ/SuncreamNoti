@@ -1,4 +1,5 @@
 import { BottomSheet } from "@toss/tds-mobile";
+import { useBackHandler } from "../lib/backHandler";
 
 interface Props {
   open: boolean;
@@ -57,6 +58,7 @@ const LEVELS: Level[] = [
  * - 단계별 권장 행동 + 신뢰 출처 표기
  */
 export function UvInfoSheet({ open, onClose }: Props) {
+  useBackHandler(open, onClose);
   return (
     <BottomSheet
       open={open}

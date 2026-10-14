@@ -1,6 +1,7 @@
 import { BottomSheet } from "@toss/tds-mobile";
 import privacyMd from "../../../docs/legal/privacy.md?raw";
 import termsMd from "../../../docs/legal/terms.md?raw";
+import { useBackHandler } from "../lib/backHandler";
 
 export type LegalKind = "terms" | "privacy";
 
@@ -21,6 +22,7 @@ const TITLE: Record<LegalKind, string> = {
  */
 export function LegalSheet({ open, kind, onClose }: Props) {
   const text = kind === "terms" ? termsMd : kind === "privacy" ? privacyMd : "";
+  useBackHandler(open, onClose);
 
   return (
     <BottomSheet
